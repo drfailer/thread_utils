@@ -1,7 +1,7 @@
 CC=g++
 CXXFLAGS=-Wall -Wextra -Wuninitialized -MMD -g -fdiagnostics-color=auto
 LDFLAGS=
-SRC=$(wildcard src/*.cpp)
+SRC=$(wildcard src/*.cpp) $(wildcard src/**/*.cpp)
 OBJ=$(addprefix build/,$(SRC:src/%.cpp=%.o))
 DEP=$(addprefix build/,$(SRC:src/%.cpp=%.d))
 
@@ -9,7 +9,7 @@ prog: $(OBJ)
 	$(CC) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 build/%.o: src/%.cpp
-	@mkdir -p build
+	@mkdir -p build/thread_utils
 	$(CC) $(CXXFLAGS) -o $@ -c $<
 
 clean:

@@ -3,21 +3,20 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
-
-using async_worker_exec_t = void (*)(void*);
+#include <stdint.h>
+#include "common.hpp"
 
 struct AsycWorker {
     std::thread thread;
     std::mutex mutex;
     std::condition_variable cv;
-    void *data;
-    async_worker_exec_t exec;
+    WorkerExecData exec_data;
     bool work_done, can_terminate;
 };
 
 void aw_init(AsycWorker *aw);
 void aw_fini(AsycWorker *aw);
-void aw_exec(AsycWorker *aw, async_worker_exec_t exec, void *data);
+void aw_exec(AsycWorker *aw, worker_exec_func_t exec_func, void *data, i64 index);
 void aw_wait(AsycWorker *aw);
 
 #endif

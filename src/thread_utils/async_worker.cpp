@@ -1,4 +1,5 @@
 #include "async_worker.hpp"
+#include <cassert>
 
 static void aw_run(AsycWorker *aw);
 
@@ -6,6 +7,7 @@ void aw_init(AsycWorker *aw) {
     aw->thread = std::thread(aw_run, aw);
     aw->work_done = true;
     aw->can_terminate = false;
+    aw->exec_data = {};
 }
 
 void aw_fini(AsycWorker *aw) {
@@ -19,12 +21,15 @@ void aw_fini(AsycWorker *aw) {
     }
 }
 
-void aw_exec(AsycWorker *aw, async_worker_exec_t exec, void *data) {
+void aw_exec(AsycWorker *aw, worker_exec_func_t exec_func, void *data, i64 index) {
     std::unique_lock<std::mutex> lck(aw->mutex);
     assert(true == aw->work_done);
     assert(false == aw->can_terminate);
-    aw->data = data;
-    aw->exec = exec;
+    aw->exec_data = WorkerExecData{
+        .exec_func = exec_func,
+        .data = data,
+        .index = index,
+    };
     aw->work_done = false;
     lck.unlock();
     aw->cv.notify_one();
@@ -49,7 +54,7 @@ static void aw_run(AsycWorker *aw) {
         if (aw->can_terminate) {
             break;
         }
-        aw->exec(aw->data);
+        aw->exec_data.exec_func(aw->exec_data.data, aw->exec_data.index);
         aw->work_done = true;
         lck.unlock();
         aw->cv.notify_one();

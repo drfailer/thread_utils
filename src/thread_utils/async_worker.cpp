@@ -20,8 +20,9 @@ void aw_fini(AsycWorker *aw) {
 }
 
 void aw_exec(AsycWorker *aw, async_worker_exec_t exec, void *data) {
-    aw_wait(aw); // make sure the previous job is done
     std::unique_lock<std::mutex> lck(aw->mutex);
+    assert(true == aw->work_done);
+    assert(false == aw->can_terminate);
     aw->data = data;
     aw->exec = exec;
     aw->work_done = false;

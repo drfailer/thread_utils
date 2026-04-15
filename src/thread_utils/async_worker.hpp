@@ -6,17 +6,17 @@
 #include <stdint.h>
 #include "common.hpp"
 
-struct AsycWorker {
+struct TU_AsycWorker {
     std::thread thread;
     std::mutex mutex;
     std::condition_variable cv;
-    WorkerExecData exec_data;
+    TU_WorkerExecData exec_data;
     bool work_done, can_terminate;
 };
 
-void aw_init(AsycWorker *aw);
-void aw_fini(AsycWorker *aw);
-void aw_exec(AsycWorker *aw, worker_exec_func_t exec_func, void *data, i64 index);
-void aw_wait(AsycWorker *aw);
+void tu_aw_init(TU_AsycWorker *aw);
+void tu_aw_fini(TU_AsycWorker *aw);
+void tu_aw_exec(TU_AsycWorker *aw, tu_worker_exec_func_t exec_func, void *data, tu_i64 index);
+void tu_aw_wait(TU_AsycWorker *aw);
 
 #endif

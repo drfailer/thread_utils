@@ -1,16 +1,16 @@
 #include "async_worker.hpp"
 #include <cassert>
 
-static void aw_run(AsycWorker *aw);
+static void tu_aw_run(TU_AsycWorker *aw);
 
-void aw_init(AsycWorker *aw) {
-    aw->thread = std::thread(aw_run, aw);
+void tu_aw_init(TU_AsycWorker *aw) {
+    aw->thread = std::thread(tu_aw_run, aw);
     aw->work_done = true;
     aw->can_terminate = false;
     aw->exec_data = {};
 }
 
-void aw_fini(AsycWorker *aw) {
+void tu_aw_fini(TU_AsycWorker *aw) {
     {
         std::unique_lock<std::mutex> lck(aw->mutex);
         aw->can_terminate = true;
@@ -21,11 +21,11 @@ void aw_fini(AsycWorker *aw) {
     }
 }
 
-void aw_exec(AsycWorker *aw, worker_exec_func_t exec_func, void *data, i64 index) {
+void tu_aw_exec(TU_AsycWorker *aw, tu_worker_exec_func_t exec_func, void *data, tu_i64 index) {
     std::unique_lock<std::mutex> lck(aw->mutex);
     assert(true == aw->work_done);
     assert(false == aw->can_terminate);
-    aw->exec_data = WorkerExecData{
+    aw->exec_data = TU_WorkerExecData{
         .exec_func = exec_func,
         .data = data,
         .index = index,
@@ -35,7 +35,7 @@ void aw_exec(AsycWorker *aw, worker_exec_func_t exec_func, void *data, i64 index
     aw->cv.notify_one();
 }
 
-void aw_wait(AsycWorker *aw) {
+void tu_aw_wait(TU_AsycWorker *aw) {
     if (aw->work_done) {
         return;
     }
@@ -45,7 +45,7 @@ void aw_wait(AsycWorker *aw) {
     });
 }
 
-static void aw_run(AsycWorker *aw) {
+static void tu_aw_run(TU_AsycWorker *aw) {
     for (;;) {
         std::unique_lock<std::mutex> lck(aw->mutex);
         aw->cv.wait(lck, [aw]{

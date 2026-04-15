@@ -2,14 +2,14 @@
 #define THREAD_UTILS_COMMON
 #include <stdint.h>
 
-using i64 = int64_t;
+using tu_i64 = int64_t;
 
-using worker_exec_func_t = void (*)(void*, i64);
+using tu_worker_exec_func_t = void (*)(void*, tu_i64);
 
-struct WorkerExecData {
-    worker_exec_func_t exec_func;
+struct TU_WorkerExecData {
+    tu_worker_exec_func_t exec_func;
     void *data;
-    i64 index;
+    tu_i64 index;
 };
 
 #endif

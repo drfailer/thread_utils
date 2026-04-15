@@ -4,10 +4,10 @@
 
 using tu_i64 = int64_t;
 
-using tu_worker_exec_func_t = void (*)(void*, tu_i64);
+using tu_exec_func_t = void (*)(void*, tu_i64);
 
-struct TU_WorkerExecData {
-    tu_worker_exec_func_t exec_func;
+struct TU_ExecData {
+    tu_exec_func_t exec_func;
     void *data;
     tu_i64 index;
 };

@@ -21,11 +21,11 @@ void tu_aw_fini(TU_AsycWorker *aw) {
     }
 }
 
-void tu_aw_exec(TU_AsycWorker *aw, tu_worker_exec_func_t exec_func, void *data, tu_i64 index) {
+void tu_aw_exec(TU_AsycWorker *aw, tu_exec_func_t exec_func, void *data, tu_i64 index) {
     std::unique_lock<std::mutex> lck(aw->mutex);
     assert(true == aw->work_done);
     assert(false == aw->can_terminate);
-    aw->exec_data = TU_WorkerExecData{
+    aw->exec_data = TU_ExecData{
         .exec_func = exec_func,
         .data = data,
         .index = index,

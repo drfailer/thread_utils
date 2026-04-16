@@ -96,7 +96,7 @@ static void tu_gtp_worker_run(TU_GlobalThreadPoolWorker *worker) {
         tu_gtp_worker_process_operation_queue(worker);
         worker->work_done = true;
         lck.unlock();
-        worker->parent_pool->cv.notify_one();
+        worker->parent_pool->cv.notify_all();
     }
 }
 
@@ -122,6 +122,6 @@ static void tu_gtp_progress_op(TU_GlobalThreadPoolOperation *op) {
     op->handle->process_count -= 1;
     if (op->handle->process_count == 0) {
         lck.unlock();
-        op->handle->cv.notify_one();
+        op->handle->cv.notify_all();
     }
 }

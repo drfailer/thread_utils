@@ -57,6 +57,6 @@ static void tu_aw_run(TU_AsycWorker *aw) {
         aw->exec_data.exec_func(aw->exec_data.data, aw->exec_data.index);
         aw->work_done = true;
         lck.unlock();
-        aw->cv.notify_one();
+        aw->cv.notify_all();
     }
 }

@@ -7,6 +7,7 @@
 #include <queue>
 #include <chrono>
 #include "common.hpp"
+#include "tools.hpp"
 
 struct TU_GlobalThreadPool;
 
@@ -38,7 +39,7 @@ struct TU_GlobalThreadPool {
     std::vector<TU_GlobalThreadPoolWorker> workers;
 
     // profiling
-    std::chrono::nanoseconds operation_dequeue_time;
+    TU_Duration operation_dequeue_time;
 };
 
 void tu_gtp_init(TU_GlobalThreadPool *pool, tu_u64 thread_count);

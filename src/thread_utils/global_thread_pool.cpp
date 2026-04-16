@@ -103,7 +103,7 @@ static void tu_gtp_worker_run(TU_GlobalThreadPoolWorker *worker) {
 
 static bool tu_gtp_get_operation(TU_GlobalThreadPool *pool, TU_GlobalThreadPoolOperation *op) {
     bool ok = false;
-    auto tb = std::chrono::system_clock::now();
+    TU_Stopwatch sw = tu_stopwatch_start_new();
 
     pool->operation_queue_mutex.lock();
     if (!pool->operation_queue.empty()) {
@@ -112,7 +112,7 @@ static bool tu_gtp_get_operation(TU_GlobalThreadPool *pool, TU_GlobalThreadPoolO
         ok = true;
     }
     pool->operation_queue_mutex.unlock();
-    pool->operation_dequeue_time += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - tb);
+    pool->operation_dequeue_time += tu_stopwatch_stop_and_get_time(&sw);
     return ok;
 }
 

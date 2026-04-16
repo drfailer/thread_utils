@@ -86,6 +86,8 @@ void test_global_thread_pool() {
 
     timer_report(test_global_thread_pool)
     printf("\n");
+
+    printf("dequeue time = %s\n", duration_to_string(pool.operation_dequeue_time).c_str());
 }
 
 int main(int , char **) {

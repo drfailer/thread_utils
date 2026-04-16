@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <vector>
 #include <queue>
+#include <chrono>
 #include "common.hpp"
 
 struct TU_GlobalThreadPool;
@@ -35,6 +36,9 @@ struct TU_GlobalThreadPool {
     std::condition_variable cv;
     std::queue<TU_GlobalThreadPoolOperation> operation_queue;
     std::vector<TU_GlobalThreadPoolWorker> workers;
+
+    // profiling
+    std::chrono::nanoseconds operation_dequeue_time;
 };
 
 void tu_gtp_init(TU_GlobalThreadPool *pool, tu_u64 thread_count);

@@ -1,4 +1,5 @@
 #include "global_thread_pool.hpp"
+#include "../defer.hpp"
 
 static void tu_gtp_worker_run(TU_GlobalThreadPoolWorker *worker);
 static void tu_gtp_worker_process_operation_queue(TU_GlobalThreadPoolWorker *worker);
@@ -101,13 +102,18 @@ static void tu_gtp_worker_run(TU_GlobalThreadPoolWorker *worker) {
 }
 
 static bool tu_gtp_get_operation(TU_GlobalThreadPool *pool, TU_GlobalThreadPoolOperation *op) {
-    std::lock_guard<std::mutex> lck(pool->operation_queue_mutex);
-    if (pool->operation_queue.empty()) {
-        return false;
+    bool ok = false;
+    auto tb = std::chrono::system_clock::now();
+
+    pool->operation_queue_mutex.lock();
+    if (!pool->operation_queue.empty()) {
+        *op = pool->operation_queue.front();
+        pool->operation_queue.pop();
+        ok = true;
     }
-    *op = pool->operation_queue.front();
-    pool->operation_queue.pop();
-    return true;
+    pool->operation_queue_mutex.unlock();
+    pool->operation_dequeue_time += std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now() - tb);
+    return ok;
 }
 
 static void tu_gtp_worker_process_operation_queue(TU_GlobalThreadPoolWorker *worker) {

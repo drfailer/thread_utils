@@ -1,16 +1,16 @@
 #include "async_worker.hpp"
 #include <cassert>
 
-static void tu_aw_run(TU_AsycWorker *aw);
+static void tu_aw_run(TU_AsyncWorker *aw);
 
-void tu_aw_init(TU_AsycWorker *aw) {
+void tu_aw_init(TU_AsyncWorker *aw) {
     aw->thread = TU_Thread(tu_aw_run, aw);
     aw->work_done = true;
     aw->can_terminate = false;
     aw->exec_data = {};
 }
 
-void tu_aw_fini(TU_AsycWorker *aw) {
+void tu_aw_fini(TU_AsyncWorker *aw) {
     {
         TU_Lock lck(aw->mutex);
         aw->can_terminate = true;
@@ -21,7 +21,7 @@ void tu_aw_fini(TU_AsycWorker *aw) {
     }
 }
 
-void tu_aw_exec(TU_AsycWorker *aw, tu_exec_func_t exec_func, void *data, TU_i64 index) {
+void tu_aw_exec(TU_AsyncWorker *aw, tu_exec_func_t exec_func, void *data, TU_i64 index) {
     TU_Lock lck(aw->mutex);
     assert(true == aw->work_done);
     assert(false == aw->can_terminate);
@@ -35,7 +35,7 @@ void tu_aw_exec(TU_AsycWorker *aw, tu_exec_func_t exec_func, void *data, TU_i64 
     aw->cv.notify_one();
 }
 
-void tu_aw_wait(TU_AsycWorker *aw) {
+void tu_aw_wait(TU_AsyncWorker *aw) {
     if (aw->work_done) {
         return;
     }
@@ -45,7 +45,7 @@ void tu_aw_wait(TU_AsycWorker *aw) {
     });
 }
 
-static void tu_aw_run(TU_AsycWorker *aw) {
+static void tu_aw_run(TU_AsyncWorker *aw) {
     for (;;) {
         TU_Lock lck(aw->mutex);
         aw->cv.wait(lck, [aw]{

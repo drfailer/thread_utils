@@ -73,9 +73,8 @@ void tu_gtp_op_wait(TU_OperationHandle *op_handle) {
 static void tu_gtp_wake_up_new_workers(TU_GlobalThreadPool *pool, tu_u64 count) {
     size_t nb_awoken_workers = 0;
     for (auto &worker : pool->workers) {
-        if (worker.mutex.try_lock()) {
+        if (worker.work_done) {
             worker.work_done = false;
-            worker.mutex.unlock();
             worker.cv.notify_one();
             nb_awoken_workers += 1;
         }

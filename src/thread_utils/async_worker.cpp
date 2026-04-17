@@ -4,10 +4,10 @@
 static void tu_aw_run(TU_AsyncWorker *aw);
 
 void tu_aw_init(TU_AsyncWorker *aw) {
-    aw->thread = TU_Thread(tu_aw_run, aw);
     aw->work_done = true;
     aw->can_terminate = false;
     aw->exec_data = {};
+    aw->thread = TU_Thread(tu_aw_run, aw);
 }
 
 void tu_aw_fini(TU_AsyncWorker *aw) {

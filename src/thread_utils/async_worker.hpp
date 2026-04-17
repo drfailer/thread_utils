@@ -1,9 +1,5 @@
 #ifndef ASYC_WORKER
 #define ASYC_WORKER
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <stdint.h>
 #include "common.hpp"
 
 struct TU_AsycWorker {

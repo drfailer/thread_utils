@@ -1,11 +1,5 @@
 #ifndef THREAD_UTILS_THREAD_POOL
 #define THREAD_UTILS_THREAD_POOL
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <vector>
-#include <queue>
-#include <chrono>
 #include "common.hpp"
 #include "tools.hpp"
 
@@ -31,12 +25,11 @@ struct TU_ThreadPoolWorker {
     volatile bool work_done, can_terminate;
 };
 
-// TODO: replace the std::queue with something fast
 struct TU_ThreadPool {
     TU_Mutex operation_queue_mutex;
     TU_Cond cv;
-    std::queue<TU_ThreadPoolOperation> operation_queue;
-    std::vector<TU_ThreadPoolWorker> workers;
+    TU_Queue<TU_ThreadPoolOperation> operation_queue;
+    TU_Array<TU_ThreadPoolWorker> workers;
 
     // profiling
     TU_Duration operation_dequeue_time;

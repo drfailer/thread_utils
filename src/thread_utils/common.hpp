@@ -3,6 +3,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <queue>
+#include <vector>
 #include <stdint.h>
 
 
@@ -10,6 +12,12 @@ using TU_Thread = std::thread;
 using TU_Mutex = std::mutex;
 using TU_Cond = std::condition_variable;
 using TU_Lock = std::unique_lock<std::mutex>;
+
+template <typename T>
+using TU_Queue = std::queue<T>;
+
+template <typename T>
+using TU_Array = std::vector<T>;
 
 using TU_i64 = int64_t;
 using TU_u64 = uint64_t;

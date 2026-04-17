@@ -6,7 +6,7 @@ static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count);
 static void tu_tp_progress_op(TU_ThreadPoolOperation *op);
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
-    pool->workers = std::vector<TU_ThreadPoolWorker>(thread_count);
+    pool->workers = TU_Array<TU_ThreadPoolWorker>(thread_count);
     for (size_t i = 0; i < thread_count; ++i) {
         pool->workers[i].parent_pool = pool;
         pool->workers[i].parent_pool_index = i;

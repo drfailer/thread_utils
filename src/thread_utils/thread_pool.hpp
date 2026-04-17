@@ -27,7 +27,6 @@ struct TU_ThreadPoolWorker {
 
 struct TU_ThreadPool {
     TU_Mutex operation_queue_mutex;
-    TU_Cond cv;
     TU_Queue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
 
@@ -49,8 +48,5 @@ void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
 // operation termination
 bool tu_tp_op_done(TU_OperationHandle *op_handle);
 void tu_tp_op_wait(TU_OperationHandle *op_handle);
-
-// TODO: wait for the queue to be empty
-void tu_tp_wait(TU_OperationHandle *op_handle);
 
 #endif

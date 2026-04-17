@@ -94,8 +94,6 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
         }
         tu_tp_worker_process_operation_queue(worker);
         worker->work_done = true;
-        lck.unlock();
-        worker->parent_pool->cv.notify_all();
     }
 }
 

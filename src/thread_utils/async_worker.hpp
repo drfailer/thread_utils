@@ -11,7 +11,7 @@ struct TU_AsycWorker {
     std::mutex mutex;
     std::condition_variable cv;
     TU_ExecData exec_data;
-    bool work_done, can_terminate;
+    volatile bool work_done, can_terminate;
 };
 
 void tu_aw_init(TU_AsycWorker *aw);

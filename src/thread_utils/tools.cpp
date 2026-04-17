@@ -1,5 +1,9 @@
 #include "tools.hpp"
 
+/******************************************************************************/
+/*                                 stop watch                                 */
+/******************************************************************************/
+
 TU_Stopwatch tu_stopwatch_start_new() {
     return TU_Stopwatch{
         .begin = std::chrono::system_clock::now(),

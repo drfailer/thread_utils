@@ -29,9 +29,6 @@ struct TU_ThreadPool {
     TU_Mutex operation_queue_mutex;
     TU_Queue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
-
-    // profiling
-    TU_Duration operation_dequeue_time;
 };
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count);

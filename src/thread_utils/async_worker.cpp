@@ -36,10 +36,10 @@ void tu_aw_exec(TU_AsyncWorker *aw, tu_exec_func_t exec_func, void *data, TU_i64
 }
 
 void tu_aw_wait(TU_AsyncWorker *aw) {
+    TU_Lock lck(aw->mutex);
     if (aw->work_done) {
         return;
     }
-    TU_Lock lck(aw->mutex);
     aw->cv.wait(lck, [aw]{
         return aw->work_done || aw->can_terminate;
     });

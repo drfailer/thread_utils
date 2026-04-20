@@ -99,8 +99,6 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
 
 static bool tu_tp_get_operation(TU_ThreadPool *pool, TU_ThreadPoolOperation *op) {
     bool ok = false;
-    TU_Stopwatch sw = tu_stopwatch_start_new();
-
     pool->operation_queue_mutex.lock();
     if (!pool->operation_queue.empty()) {
         *op = pool->operation_queue.front();
@@ -108,7 +106,6 @@ static bool tu_tp_get_operation(TU_ThreadPool *pool, TU_ThreadPoolOperation *op)
         ok = true;
     }
     pool->operation_queue_mutex.unlock();
-    pool->operation_dequeue_time += tu_stopwatch_stop_and_get_time(&sw);
     return ok;
 }
 
@@ -123,7 +120,9 @@ static void tu_tp_progress_op(TU_ThreadPoolOperation *op) {
     TU_Lock lck(op->handle->mutex);
     op->handle->process_count -= 1;
     if (op->handle->process_count == 0) {
-        lck.unlock();
+        // we can't unlock here because we take the risk that the handle owner
+        // destroys the worker before we have time to notify
+        // lck.unlock();
         op->handle->cv.notify_all();
     }
 }

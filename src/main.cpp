@@ -14,7 +14,7 @@ void test_execute(void*, TU_i64) {
 }
 
 void test_async_worker() {
-    TU_AsycWorker worker;
+    TU_AsyncWorker worker;
     tu_aw_init(&worker);
     defer(tu_aw_fini(&worker));
 
@@ -86,8 +86,6 @@ void test_thread_pool() {
 
     timer_report(test_thread_pool)
     printf("\n");
-
-    printf("dequeue time = %s\n", duration_to_string(pool.operation_dequeue_time).c_str());
 }
 
 int main(int , char **) {

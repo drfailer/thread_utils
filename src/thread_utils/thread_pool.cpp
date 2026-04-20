@@ -10,19 +10,16 @@ void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
     for (size_t i = 0; i < thread_count; ++i) {
         pool->workers[i].parent_pool = pool;
         pool->workers[i].parent_pool_index = i;
-        pool->workers[i].work_done = true;
-        pool->workers[i].can_terminate = false;
+        pool->workers[i].work_done.store(true);
+        pool->workers[i].can_terminate.store(false);
         pool->workers[i].thread = TU_Thread(tu_tp_worker_run, &pool->workers[i]);
     }
 }
 
 void tu_tp_fini(TU_ThreadPool *pool) {
     for (auto &worker : pool->workers) {
-        {
-            TU_Lock lck(worker.mutex);
-            worker.can_terminate = true;
-        }
-        worker.cv.notify_one();
+        worker.can_terminate.store(true);
+        worker.sem.release();
         if (worker.thread.joinable()) {
             worker.thread.join();
         }
@@ -72,9 +69,8 @@ void tu_tp_op_wait(TU_OperationHandle *op_handle) {
 static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count) {
     size_t nb_awoken_workers = 0;
     for (auto &worker : pool->workers) {
-        if (worker.work_done) {
-            worker.work_done = false;
-            worker.cv.notify_one();
+        if (worker.work_done.load()) {
+            worker.sem.release();
             nb_awoken_workers += 1;
         }
         if (nb_awoken_workers >= count) {
@@ -85,15 +81,13 @@ static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count) {
 
 static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
     for (;;) {
-        TU_Lock lck(worker->mutex);
-        worker->cv.wait(lck, [worker]{
-            return !worker->work_done || worker->can_terminate;
-        });
-        if (worker->can_terminate) {
+        worker->work_done.store(true);
+        worker->sem.acquire();
+        if (worker->can_terminate.load()) {
             break;
         }
+        worker->work_done.store(false);
         tu_tp_worker_process_operation_queue(worker);
-        worker->work_done = true;
     }
 }
 

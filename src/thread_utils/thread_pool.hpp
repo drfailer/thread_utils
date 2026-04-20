@@ -8,7 +8,7 @@ struct TU_ThreadPool;
 struct TU_OperationHandle {
     TU_Mutex mutex;
     TU_Cond cv;
-    volatile TU_u64 process_count;
+    TU_u64 process_count;
 };
 
 struct TU_ThreadPoolOperation {
@@ -18,11 +18,10 @@ struct TU_ThreadPoolOperation {
 
 struct TU_ThreadPoolWorker {
     TU_Thread thread;
-    TU_Mutex mutex;
-    TU_Cond cv;
+    TU_BinSem sem = TU_BinSem{0};
     TU_ThreadPool *parent_pool;
     TU_u64 parent_pool_index;
-    volatile bool work_done, can_terminate;
+    TU_AtomicFlag work_done, can_terminate;
 };
 
 struct TU_ThreadPool {

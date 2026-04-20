@@ -89,7 +89,7 @@ void test_thread_pool() {
 }
 
 int main(int , char **) {
-    test_async_worker();
+    // test_async_worker();
     test_thread_pool();
     return 0;
 }

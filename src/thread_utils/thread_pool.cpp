@@ -70,9 +70,12 @@ static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count) {
     size_t nb_awoken_workers = 0;
     for (auto &worker : pool->workers) {
         if (worker.work_done.load()) {
-            worker.sem.release();
             nb_awoken_workers += 1;
         }
+        // We always increment the semaphore even if the worker is already
+        // working to avoid deadlock in the case when the worker left the
+        // dequeue loop before but didn't change its flag yet.
+        worker.sem.release();
         if (nb_awoken_workers >= count) {
             break;
         }

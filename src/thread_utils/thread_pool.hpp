@@ -18,7 +18,7 @@ struct TU_ThreadPoolOperation {
 
 struct TU_ThreadPoolWorker {
     TU_Thread thread;
-    TU_BinSem sem = TU_BinSem{0};
+    TU_Sem sem = TU_Sem{0};
     TU_ThreadPool *parent_pool;
     TU_u64 parent_pool_index;
     TU_AtomicFlag work_done, can_terminate;

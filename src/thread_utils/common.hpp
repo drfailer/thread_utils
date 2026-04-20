@@ -13,6 +13,7 @@
 using TU_Thread = std::thread;
 using TU_Mutex = std::mutex;
 using TU_Cond = std::condition_variable;
+using TU_Sem = std::counting_semaphore<256>;
 using TU_BinSem = std::counting_semaphore<1>;
 using TU_AtomicFlag = std::atomic<bool>;
 using TU_Lock = std::unique_lock<std::mutex>;

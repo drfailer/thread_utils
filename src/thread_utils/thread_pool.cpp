@@ -31,8 +31,8 @@ void tu_tp_fini(TU_ThreadPool *pool) {
 
 void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
                  TU_i64 index, TU_OperationHandle *op_handle) {
+    TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = 1;
-    // enqueue the new operation
     tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
             .exec_data = {
                 .exec_func = exec_func,
@@ -41,11 +41,14 @@ void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
             },
             .handle = op_handle,
     });
+    pool->enqueue_dur += tu_stopwatch_stop_and_get_time(&sw).count();
+    pool->enqueue_count++;
     pool->sem.release(1);
 }
 
 void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
                   TU_OperationHandle *op_handle) {
+    TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = jobs_len;
     for (size_t i = 0; i < jobs_len; ++i) {
         tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
@@ -53,6 +56,8 @@ void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
             .handle = op_handle,
         });
     }
+    pool->enqueue_dur += tu_stopwatch_stop_and_get_time(&sw).count();
+    pool->enqueue_count += jobs_len;
     pool->sem.release(jobs_len);
 }
 
@@ -77,8 +82,16 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
     }
 }
 
+static bool tu_tp_worker_try_pop(TU_ThreadPool *pool, TU_ThreadPoolOperation *op) {
+    TU_Stopwatch sw = tu_stopwatch_start_new();
+    bool ok = tu_lfq_pop(&pool->operation_queue, op);
+    pool->dequeue_dur += tu_stopwatch_stop_and_get_time(&sw).count();
+    pool->dequeue_count++;
+    return ok;
+}
+
 static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker) {
-    for (TU_ThreadPoolOperation op = {}; tu_lfq_pop(&worker->parent_pool->operation_queue, &op);) {
+    for (TU_ThreadPoolOperation op = {}; tu_tp_worker_try_pop(worker->parent_pool, &op);) {
         op.exec_data.exec_func(op.exec_data.data, op.exec_data.index);
         tu_tp_progress_op(&op);
     }

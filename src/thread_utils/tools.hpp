@@ -1,6 +1,7 @@
 #ifndef TOOLS
 #define TOOLS
 #include <chrono>
+#include "common.hpp"
 
 /******************************************************************************/
 /*                                 stopwatch                                  */
@@ -20,5 +21,7 @@ void tu_stopwatch_start(TU_Stopwatch *sw);
 void tu_stopwatch_stop(TU_Stopwatch *sw);
 TU_Duration tu_stopwatch_get_time(TU_Stopwatch *sw);
 TU_Duration tu_stopwatch_stop_and_get_time(TU_Stopwatch *sw);
+
+void tu_duration_print(char const *label, TU_Duration duration);
 
 #endif

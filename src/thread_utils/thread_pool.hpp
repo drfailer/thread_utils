@@ -28,6 +28,11 @@ struct TU_ThreadPool {
     TU_Sem sem = TU_Sem{0};
     TU_LockFreeQueue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
+    // profiling
+    TU_Atomic<size_t> enqueue_dur;
+    TU_Atomic<size_t> enqueue_count;
+    TU_Atomic<size_t> dequeue_dur;
+    TU_Atomic<size_t> dequeue_count;
 };
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count);

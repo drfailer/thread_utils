@@ -87,6 +87,9 @@ void test_thread_pool() {
 
     timer_report(test_thread_pool)
     printf("\n");
+
+    tu_duration_print("enqueue time", static_cast<TU_Duration>(pool.enqueue_dur));
+    tu_duration_print("dequeue time", static_cast<TU_Duration>(pool.dequeue_dur));
 }
 
 void test_lock_free_queue() {

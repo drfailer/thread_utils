@@ -19,6 +19,9 @@ using TU_AtomicFlag = std::atomic<bool>;
 using TU_Lock = std::unique_lock<std::mutex>;
 
 template <typename T>
+using TU_Atomic = std::atomic<T>;
+
+template <typename T>
 using TU_Queue = std::queue<T>;
 
 template <typename T>

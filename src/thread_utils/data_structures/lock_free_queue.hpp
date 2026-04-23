@@ -7,74 +7,96 @@
 
 #ifndef THREAD_UTILS_DATA_STRUCTURES_LOCK_FREE_QUEUE
 #define THREAD_UTILS_DATA_STRUCTURES_LOCK_FREE_QUEUE
-#include <memory>
 #include "../common.hpp"
+#include <cassert>
 
 template <typename T>
 struct TU_LockFreeQueue {
     struct Node;
-    using NodePtr = std::shared_ptr<Node>;
+    // The algorithm use tagged pointers to make the list ABA safe. The count is
+    // a version number that makes the CAS equality test fail in ABA cases.
+    //
+    // Note(linker): use `-latomic` to enable 16 bit atomics.
+    // Note(x86_64): compile with `-mcx16` to allow the compiler to generate the
+    //               `cmpxchg16b` instruction.
+    struct alignas(16) NodePtr {
+        Node *ptr = nullptr;
+        size_t count = 0;
+
+        bool operator==(NodePtr const &other) const {
+            return other.ptr == this->ptr && other.count == this->count;
+        }
+    };
     struct Node {
         T data;
         TU_Atomic<NodePtr> next;
     };
 
-    TU_Atomic<NodePtr> head;
-    TU_Atomic<NodePtr> tail;
+    alignas(64) TU_Atomic<NodePtr> head_;
+    alignas(64) TU_Atomic<NodePtr> tail_;
 
     TU_LockFreeQueue() {
-        auto node = std::make_shared<Node>();
-        this->head.store(node);
-        this->tail.store(node);
+        auto node = new Node();
+        this->head_.store({node, 0});
+        this->tail_.store({node, 0});
+        if (!this->head_.is_lock_free()) {
+            printf("[TU_ERRO]: 16 bits atomics are not available on this platform (default to internal mutex).\n");
+        }
     }
 
     ~TU_LockFreeQueue() {
-        // TODO: the shared_ptr version doesn't require free
+        for (NodePtr node = this->head_.load(); node.ptr != nullptr;) {
+            NodePtr next = node.ptr->next;
+            delete node.ptr;
+            node = next;
+        }
     }
 
     void push(T value) {
         NodePtr tail, next;
-        auto node = std::make_shared<Node>();
+        auto node = new Node();
         node->data = std::move(value);
-        node->next = nullptr;
+        node->next.store({nullptr, 0});
 
         for (;;) {
-            tail = this->tail.load();
-            next = tail->next.load();
+            tail = this->tail_.load();
+            next = tail.ptr->next.load();
 
-            if (tail == this->tail.load()) {
-                if (next == nullptr) {
-                    if (tail->next.compare_exchange_weak(next, node)) {
+            if (tail == this->tail_.load()) {
+                if (next.ptr == nullptr) {
+                    if (tail.ptr->next.compare_exchange_weak(next, {node, next.count + 1})) {
                         // 1: enthis is done
                         break;
                     }
                 } else {
                     // 2: the tail is lagging, so we try to update it
-                    this->tail.compare_exchange_weak(tail, next);
+                    this->tail_.compare_exchange_weak(tail, {next.ptr, tail.count + 1});
                 }
             }
         }
         // 3: try to update the tail (another thread will do the update in 2 if this fails)
-        this->tail.compare_exchange_weak(tail, node);
+        this->tail_.compare_exchange_weak(tail, {node, tail.count + 1});
     }
 
     bool pop(T *result) {
-        for (;;) {
-            NodePtr head = this->head.load();
-            NodePtr tail = this->tail.load();
-            NodePtr next = head->next.load();
+        NodePtr head, tail, next;
 
-            if (head == this->head.load()) {
+        for (;;) {
+            head = this->head_.load();
+            tail = this->tail_.load();
+            next = head.ptr->next.load();
+
+            if (head == this->head_.load()) {
                 if (head == tail) { // either this empty or tail lags
-                    if (next == nullptr) { // the this is empty
+                    if (next.ptr == nullptr) { // the this is empty
                         return false;
                     }
                     // the tail is lagging so we try to advance it
-                    this->tail.compare_exchange_weak(tail, next);
+                    this->tail_.compare_exchange_weak(tail, {next.ptr, tail.count + 1});
                 } else {
                     // read the value before exchange
-                    *result = next->data;
-                    if (this->head.compare_exchange_weak(head, next)) {
+                    *result = next.ptr->data;
+                    if (this->head_.compare_exchange_weak(head, {next.ptr, head.count + 1})) {
                         // we were able to advance the head therefore our result
                         // contains the right head value, otherwise, the head we
                         // read has been moved by another thread so we need to
@@ -84,7 +106,7 @@ struct TU_LockFreeQueue {
                 }
             }
         }
-        // TODO: free head
+        delete head.ptr;
         return true;
     }
 };

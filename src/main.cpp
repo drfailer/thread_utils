@@ -10,7 +10,7 @@
 void test_execute(void*, TU_i64) {
     using namespace std::literals::chrono_literals;
     printf("start work...\n");
-    std::this_thread::sleep_for(5s);
+    std::this_thread::sleep_for(0.2s);
     printf("end work\n");
 }
 
@@ -37,7 +37,7 @@ void test_async_worker() {
 }
 
 void test_thread_pool() {
-    constexpr size_t POOL_SIZE = 40;
+    constexpr size_t POOL_SIZE = 10;
     TU_ThreadPool pool;
     tu_tp_init(&pool, POOL_SIZE);
     defer(tu_tp_fini(&pool));
@@ -46,23 +46,23 @@ void test_thread_pool() {
     timer_start(test_thread_pool);
     printf("begin test thread pool.\n\n");
 
-    printf("run exec single job\n");
-    timer_start(exec_single_job);
-    tu_tp_exec(&pool, test_execute, nullptr, 0, &op);
-    {
-        using namespace std::literals::chrono_literals;
-        std::this_thread::sleep_for(3s);
-    }
-    printf("wait for single job...\n");
-    tu_tp_op_wait(&op);
-    timer_end(exec_single_job);
-    printf("end single job\n");
+    // printf("run exec single job\n");
+    // timer_start(exec_single_job);
+    // tu_tp_exec(&pool, test_execute, nullptr, 0, &op);
+    // {
+    //     using namespace std::literals::chrono_literals;
+    //     std::this_thread::sleep_for(3s);
+    // }
+    // printf("wait for single job...\n");
+    // tu_tp_op_wait(&op);
+    // timer_end(exec_single_job);
+    // printf("end single job\n");
+    //
+    // timer_report(exec_single_job);
+    //
+    // printf("\n");
 
-    timer_report(exec_single_job);
-
-    printf("\n");
-
-    constexpr size_t JOB_COUNT = 3*POOL_SIZE;
+    constexpr size_t JOB_COUNT = 10*POOL_SIZE;
     TU_ExecData jobs[JOB_COUNT];
     for (size_t i = 0; i < JOB_COUNT; ++i) {
         jobs[i].exec_func = test_execute;
@@ -100,7 +100,7 @@ void test_lock_free_queue() {
         queue.push(i);
     }
     for (int i = 0; i < 10; ++i) {
-        int value;
+        int value = -1;
         if (!queue.pop(&value)) {
             printf("failed to pop at %d\n", i);
         }

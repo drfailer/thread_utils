@@ -5,7 +5,6 @@ static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker);
 static void tu_tp_progress_op(TU_ThreadPoolOperation *op);
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
-    tu_lfq_init(&pool->operation_queue);
     pool->workers = TU_Array<TU_ThreadPoolWorker>(thread_count);
     for (size_t i = 0; i < thread_count; ++i) {
         pool->workers[i].parent_pool = pool;
@@ -26,14 +25,13 @@ void tu_tp_fini(TU_ThreadPool *pool) {
             worker.thread.join();
         }
     }
-    tu_lfq_fini(&pool->operation_queue);
 }
 
 void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
                  TU_i64 index, TU_OperationHandle *op_handle) {
     TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = 1;
-    tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
+    pool->operation_queue.push(TU_ThreadPoolOperation{
             .exec_data = {
                 .exec_func = exec_func,
                 .data = data,
@@ -51,7 +49,7 @@ void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
     TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = jobs_len;
     for (size_t i = 0; i < jobs_len; ++i) {
-        tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
+        pool->operation_queue.push(TU_ThreadPoolOperation{
             .exec_data = jobs[i],
             .handle = op_handle,
         });
@@ -84,7 +82,7 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
 
 static bool tu_tp_worker_try_pop(TU_ThreadPool *pool, TU_ThreadPoolOperation *op) {
     TU_Stopwatch sw = tu_stopwatch_start_new();
-    bool ok = tu_lfq_pop(&pool->operation_queue, op);
+    bool ok = pool->operation_queue.pop(op);
     pool->dequeue_dur += tu_stopwatch_stop_and_get_time(&sw).count();
     pool->dequeue_count++;
     return ok;

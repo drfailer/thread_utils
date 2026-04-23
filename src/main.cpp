@@ -37,7 +37,7 @@ void test_async_worker() {
 }
 
 void test_thread_pool() {
-    constexpr size_t POOL_SIZE = 4;
+    constexpr size_t POOL_SIZE = 40;
     TU_ThreadPool pool;
     tu_tp_init(&pool, POOL_SIZE);
     defer(tu_tp_fini(&pool));
@@ -95,16 +95,13 @@ void test_thread_pool() {
 void test_lock_free_queue() {
     TU_LockFreeQueue<int> queue;
 
-    tu_lfq_init(&queue);
-    defer(tu_lfq_fini(&queue));
-
     printf("single thread push/pop in lfq:\n");
     for (int i = 0; i < 10; ++i) {
-        tu_lfq_push(&queue, i);
+        queue.push(i);
     }
     for (int i = 0; i < 10; ++i) {
         int value;
-        if (!tu_lfq_pop(&queue, &value)) {
+        if (!queue.pop(&value)) {
             printf("failed to pop at %d\n", i);
         }
         if (value != i) {

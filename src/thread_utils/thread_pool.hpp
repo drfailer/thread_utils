@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "tools.hpp"
 #include "data_structures/lock_free_queue.hpp"
+#include "data_structures/lock_queue.hpp"
 
 struct TU_ThreadPool;
 
@@ -27,6 +28,7 @@ struct TU_ThreadPoolWorker {
 struct TU_ThreadPool {
     TU_Sem sem = TU_Sem{0};
     TU_LockFreeQueue<TU_ThreadPoolOperation> operation_queue;
+    // TU_LockQueue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
     // profiling
     TU_Atomic<size_t> enqueue_dur;

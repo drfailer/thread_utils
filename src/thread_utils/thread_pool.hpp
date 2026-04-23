@@ -18,7 +18,6 @@ struct TU_ThreadPoolOperation {
 
 struct TU_ThreadPoolWorker {
     TU_Thread thread;
-    TU_Sem sem = TU_Sem{0};
     TU_ThreadPool *parent_pool;
     TU_u64 parent_pool_index;
     TU_AtomicFlag work_done, can_terminate;
@@ -26,6 +25,7 @@ struct TU_ThreadPoolWorker {
 
 struct TU_ThreadPool {
     TU_Mutex operation_queue_mutex;
+    TU_Sem sem = TU_Sem{0};
     TU_Queue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
 };

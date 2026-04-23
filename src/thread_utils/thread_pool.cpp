@@ -2,7 +2,6 @@
 
 static void tu_tp_worker_run(TU_ThreadPoolWorker *worker);
 static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker);
-static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count);
 static void tu_tp_progress_op(TU_ThreadPoolOperation *op);
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
@@ -19,7 +18,9 @@ void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
 void tu_tp_fini(TU_ThreadPool *pool) {
     for (auto &worker : pool->workers) {
         worker.can_terminate.store(true);
-        worker.sem.release();
+    }
+    pool->sem.release(pool->workers.size());
+    for (auto &worker : pool->workers) {
         if (worker.thread.joinable()) {
             worker.thread.join();
         }
@@ -40,7 +41,7 @@ void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
             .handle = op_handle,
     });
     pool->operation_queue_mutex.unlock();
-    tu_tp_wake_up_new_workers(pool, 1);
+    pool->sem.release(1);
 }
 
 void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
@@ -54,7 +55,7 @@ void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
         });
     }
     pool->operation_queue_mutex.unlock();
-    tu_tp_wake_up_new_workers(pool, jobs_len);
+    pool->sem.release(jobs_len);
 }
 
 bool tu_tp_op_done(TU_OperationHandle *op_handle) {
@@ -66,26 +67,10 @@ void tu_tp_op_wait(TU_OperationHandle *op_handle) {
     op_handle->cv.wait(lck, [op_handle]() { return tu_tp_op_done(op_handle); });
 }
 
-static void tu_tp_wake_up_new_workers(TU_ThreadPool *pool, TU_u64 count) {
-    size_t nb_awoken_workers = 0;
-    for (auto &worker : pool->workers) {
-        if (worker.work_done.load()) {
-            nb_awoken_workers += 1;
-        }
-        // We always increment the semaphore even if the worker is already
-        // working to avoid deadlock in the case when the worker left the
-        // dequeue loop before but didn't change its flag yet.
-        worker.sem.release();
-        if (nb_awoken_workers >= count) {
-            break;
-        }
-    }
-}
-
 static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
     for (;;) {
         worker->work_done.store(true);
-        worker->sem.acquire();
+        worker->parent_pool->sem.acquire();
         if (worker->can_terminate.load()) {
             break;
         }

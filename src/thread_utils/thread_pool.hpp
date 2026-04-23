@@ -2,6 +2,7 @@
 #define THREAD_UTILS_THREAD_POOL
 #include "common.hpp"
 #include "tools.hpp"
+#include "data_structures/lock_free_queue.hpp"
 
 struct TU_ThreadPool;
 
@@ -24,9 +25,8 @@ struct TU_ThreadPoolWorker {
 };
 
 struct TU_ThreadPool {
-    TU_Mutex operation_queue_mutex;
     TU_Sem sem = TU_Sem{0};
-    TU_Queue<TU_ThreadPoolOperation> operation_queue;
+    TU_LockFreeQueue<TU_ThreadPoolOperation> operation_queue;
     TU_Array<TU_ThreadPoolWorker> workers;
 };
 

@@ -3,6 +3,7 @@
 #include <thread>
 #include <chrono>
 #include "thread_utils/thread_utils.hpp"
+#include "thread_utils/data_structures/lock_free_queue.hpp"
 #include "defer.hpp"
 #include "timer.hpp"
 
@@ -88,8 +89,30 @@ void test_thread_pool() {
     printf("\n");
 }
 
+void test_lock_free_queue() {
+    TU_LockFreeQueue<int> queue;
+
+    tu_lfq_init(&queue);
+    defer(tu_lfq_fini(&queue));
+
+    printf("single thread push/pop in lfq:\n");
+    for (int i = 0; i < 10; ++i) {
+        tu_lfq_push(&queue, i);
+    }
+    for (int i = 0; i < 10; ++i) {
+        int value;
+        if (!tu_lfq_pop(&queue, &value)) {
+            printf("failed to pop at %d\n", i);
+        }
+        if (value != i) {
+            printf("poped %d expected %d\n", value, i);
+        }
+    }
+}
+
 int main(int , char **) {
-    test_async_worker();
+    // test_async_worker();
+    test_lock_free_queue();
     test_thread_pool();
     return 0;
 }

@@ -5,6 +5,7 @@ static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker);
 static void tu_tp_progress_op(TU_ThreadPoolOperation *op);
 
 void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
+    tu_lfq_init(&pool->operation_queue);
     pool->workers = TU_Array<TU_ThreadPoolWorker>(thread_count);
     for (size_t i = 0; i < thread_count; ++i) {
         pool->workers[i].parent_pool = pool;
@@ -25,14 +26,14 @@ void tu_tp_fini(TU_ThreadPool *pool) {
             worker.thread.join();
         }
     }
+    tu_lfq_fini(&pool->operation_queue);
 }
 
 void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
                  TU_i64 index, TU_OperationHandle *op_handle) {
     op_handle->process_count = 1;
     // enqueue the new operation
-    pool->operation_queue_mutex.lock();
-    pool->operation_queue.push(TU_ThreadPoolOperation{
+    tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
             .exec_data = {
                 .exec_func = exec_func,
                 .data = data,
@@ -40,21 +41,18 @@ void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
             },
             .handle = op_handle,
     });
-    pool->operation_queue_mutex.unlock();
     pool->sem.release(1);
 }
 
 void tu_tp_lauch(TU_ThreadPool *pool, TU_ExecData *jobs, size_t jobs_len,
                   TU_OperationHandle *op_handle) {
     op_handle->process_count = jobs_len;
-    pool->operation_queue_mutex.lock();
     for (size_t i = 0; i < jobs_len; ++i) {
-        pool->operation_queue.push(TU_ThreadPoolOperation{
+        tu_lfq_push(&pool->operation_queue, TU_ThreadPoolOperation{
             .exec_data = jobs[i],
             .handle = op_handle,
         });
     }
-    pool->operation_queue_mutex.unlock();
     pool->sem.release(jobs_len);
 }
 
@@ -79,20 +77,8 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker) {
     }
 }
 
-static bool tu_tp_get_operation(TU_ThreadPool *pool, TU_ThreadPoolOperation *op) {
-    bool ok = false;
-    pool->operation_queue_mutex.lock();
-    if (!pool->operation_queue.empty()) {
-        *op = pool->operation_queue.front();
-        pool->operation_queue.pop();
-        ok = true;
-    }
-    pool->operation_queue_mutex.unlock();
-    return ok;
-}
-
 static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker) {
-    for (TU_ThreadPoolOperation op = {}; tu_tp_get_operation(worker->parent_pool, &op);) {
+    for (TU_ThreadPoolOperation op = {}; tu_lfq_pop(&worker->parent_pool->operation_queue, &op);) {
         op.exec_data.exec_func(op.exec_data.data, op.exec_data.index);
         tu_tp_progress_op(&op);
     }

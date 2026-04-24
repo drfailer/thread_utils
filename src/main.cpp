@@ -4,6 +4,7 @@
 #include <chrono>
 #include "thread_utils/thread_utils.hpp"
 #include "thread_utils/data_structures/lock_free_queue.hpp"
+#include "thread_utils/data_structures/work_steal_queue.hpp"
 #include "defer.hpp"
 #include "timer.hpp"
 
@@ -110,9 +111,28 @@ void test_lock_free_queue() {
     }
 }
 
+void test_work_steal_queue() {
+    TU_WorkStealQueue<int> queue;
+
+    printf("single thread push/pop in wsq:\n");
+    for (int i = 0; i < 10; ++i) {
+        queue.push(i);
+    }
+    for (int i = 9; i >= 0; --i) {
+        int value = 0;
+        if (!queue.pop(&value)) {
+            printf("failed to pop at %d\n", i);
+        }
+        if (value != i) {
+            printf("poped %d expected %d\n", value, i);
+        }
+    }
+}
+
 int main(int , char **) {
     // test_async_worker();
-    test_lock_free_queue();
-    test_thread_pool();
+    // test_lock_free_queue();
+    test_work_steal_queue();
+    // test_thread_pool();
     return 0;
 }

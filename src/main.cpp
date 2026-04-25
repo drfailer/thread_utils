@@ -47,21 +47,21 @@ void test_thread_pool() {
     timer_start(test_thread_pool);
     printf("begin test thread pool.\n\n");
 
-    // printf("run exec single job\n");
-    // timer_start(exec_single_job);
-    // tu_tp_exec(&pool, test_execute, nullptr, 0, &op);
-    // {
-    //     using namespace std::literals::chrono_literals;
-    //     std::this_thread::sleep_for(3s);
-    // }
-    // printf("wait for single job...\n");
-    // tu_tp_op_wait(&op);
-    // timer_end(exec_single_job);
-    // printf("end single job\n");
-    //
-    // timer_report(exec_single_job);
-    //
-    // printf("\n");
+    printf("run exec single job\n");
+    timer_start(exec_single_job);
+    tu_tp_exec(&pool, test_execute, nullptr, 0, &op);
+    {
+        using namespace std::literals::chrono_literals;
+        std::this_thread::sleep_for(3s);
+    }
+    printf("wait for single job...\n");
+    tu_tp_op_wait(&op);
+    timer_end(exec_single_job);
+    printf("end single job\n");
+
+    timer_report(exec_single_job);
+
+    printf("\n");
 
     constexpr size_t JOB_COUNT = 10*POOL_SIZE;
     TU_ExecData jobs[JOB_COUNT];
@@ -130,9 +130,9 @@ void test_work_steal_queue() {
 }
 
 int main(int , char **) {
-    // test_async_worker();
-    // test_lock_free_queue();
+    test_async_worker();
+    test_lock_free_queue();
     test_work_steal_queue();
-    // test_thread_pool();
+    test_thread_pool();
     return 0;
 }

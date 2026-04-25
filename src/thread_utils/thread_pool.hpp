@@ -40,7 +40,7 @@ void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count);
 void tu_tp_fini(TU_ThreadPool *pool);
 
 // single operation instructions
-void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
+void tu_tp_exec(TU_ThreadPool *pool, TU_ExecProc exec_func, void *data,
                  TU_i64 index, TU_OperationHandle *op_handle);
 
 // multiple operations instructions

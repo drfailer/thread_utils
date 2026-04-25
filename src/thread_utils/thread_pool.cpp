@@ -27,7 +27,7 @@ void tu_tp_fini(TU_ThreadPool *pool) {
     }
 }
 
-void tu_tp_exec(TU_ThreadPool *pool, tu_exec_func_t exec_func, void *data,
+void tu_tp_exec(TU_ThreadPool *pool, TU_ExecProc exec_func, void *data,
                  TU_i64 index, TU_OperationHandle *op_handle) {
     TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = 1;

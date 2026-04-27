@@ -6,10 +6,11 @@
 struct TU_Graph;
 struct TU_GraphThreadGroup;
 
-using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, tu_i64);
+using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, void*, tu_i64);
 
 struct TU_GraphOperation {
     TU_GraphExecProc exec = nullptr;
+    void *ctx = nullptr;
     void *data = nullptr;
     tu_i64 index = 0;
 };
@@ -51,6 +52,6 @@ void tu_graph_wait_completion(TU_Graph *graph);
 void tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
-                        void *data, tu_i64 index);
+                        void *ctx, void *data, tu_i64 index);
 
 #endif

@@ -52,12 +52,13 @@ void tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
 }
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
-                        void *data, tu_i64 index) {
+                        void *ctx, void *data, tu_i64 index) {
     assert(graph != nullptr);
     assert(group < graph->groups.size());
     graph->operation_counter += 1;
     graph->groups[group].queue.push(TU_GraphOperation{
             .exec = exec,
+            .ctx = ctx,
             .data = data,
             .index = index,
     });
@@ -99,7 +100,7 @@ static void tu_graph_worker_process_operation_queue(TU_GraphWorker *worker) {
     assert(worker->group != nullptr);
     assert(worker->group->graph != nullptr);
     for (TU_GraphOperation op = {}; tu_graph_worker_get_op(worker->group, &op);) {
-        op.exec(worker->group->graph, op.data, op.index);
+        op.exec(worker->group->graph, op.ctx, op.data, op.index);
         worker->group->graph->operation_counter -= 1;
     }
 }

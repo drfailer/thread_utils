@@ -23,15 +23,15 @@ using TU_Atomic = std::atomic<T>;
 template <typename T>
 using TU_Array = std::vector<T>;
 
-using TU_i64 = int64_t;
-using TU_u64 = uint64_t;
+using tu_i64 = int64_t;
+using tu_u64 = uint64_t;
 
-using TU_ExecProc = void (*)(void*, TU_i64);
+using TU_ExecProc = void (*)(void*, tu_i64);
 
 struct TU_ExecData {
     TU_ExecProc exec_func;
     void *data;
-    TU_i64 index;
+    tu_i64 index;
 };
 
 #endif

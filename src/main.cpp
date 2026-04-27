@@ -8,7 +8,7 @@
 #include "defer.hpp"
 #include "timer.hpp"
 
-void test_execute(void*, TU_i64) {
+void test_execute(void*, tu_i64) {
     using namespace std::literals::chrono_literals;
     printf("start work...\n");
     std::this_thread::sleep_for(0.2s);

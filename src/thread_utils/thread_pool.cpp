@@ -4,7 +4,7 @@ static void tu_tp_worker_run(TU_ThreadPoolWorker *worker);
 static void tu_tp_worker_process_operation_queue(TU_ThreadPoolWorker *worker);
 static void tu_tp_progress_op(TU_ThreadPoolOperation *op);
 
-void tu_tp_init(TU_ThreadPool *pool, TU_u64 thread_count) {
+void tu_tp_init(TU_ThreadPool *pool, tu_u64 thread_count) {
     pool->workers = TU_Array<TU_ThreadPoolWorker>(thread_count);
     for (size_t i = 0; i < thread_count; ++i) {
         pool->workers[i].parent_pool = pool;
@@ -28,7 +28,7 @@ void tu_tp_fini(TU_ThreadPool *pool) {
 }
 
 void tu_tp_exec(TU_ThreadPool *pool, TU_ExecProc exec_func, void *data,
-                 TU_i64 index, TU_OperationHandle *op_handle) {
+                 tu_i64 index, TU_OperationHandle *op_handle) {
     TU_Stopwatch sw = tu_stopwatch_start_new();
     op_handle->process_count = 1;
     pool->operation_queue.push(TU_ThreadPoolOperation{

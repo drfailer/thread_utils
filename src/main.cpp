@@ -129,10 +129,41 @@ void test_work_steal_queue() {
     }
 }
 
+void test_graph() {
+    TU_Graph graph;
+    tu_graph_init(&graph);
+    defer(tu_graph_fini(&graph));
+
+    tu_graph_add_thread_group(&graph, 2);
+
+    struct TestData {
+        size_t counter = 0;
+    };
+    TestData data;
+    tu_graph_push_task(&graph, 0, [](TU_Graph *graph, void *rawdata, tu_i64) {
+        auto data = (TestData*)rawdata;
+        data->counter += 1;
+        using namespace std::literals::chrono_literals;
+        std::this_thread::sleep_for(0.2s);
+        printf("data.counter = %ld\n", data->counter);
+        for (size_t i = 0; i < 10; ++i) {
+            tu_graph_push_task(graph, 0, [](TU_Graph *, void *rawdata, tu_i64 index) {
+                auto data = (TestData*)rawdata;
+                using namespace std::literals::chrono_literals;
+                std::this_thread::sleep_for(0.2s);
+                printf("extra task: %ld\n", data->counter * index);
+            }, rawdata, i);
+        }
+    }, &data, 0);
+
+    tu_graph_wait_completion(&graph);
+}
+
 int main(int , char **) {
-    test_async_worker();
-    test_lock_free_queue();
-    test_work_steal_queue();
-    test_thread_pool();
+    // test_async_worker();
+    // test_lock_free_queue();
+    // test_work_steal_queue();
+    // test_thread_pool();
+    test_graph();
     return 0;
 }

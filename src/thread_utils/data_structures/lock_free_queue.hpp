@@ -41,11 +41,22 @@ struct TU_LockFreeQueue {
     alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> head_;
     alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> tail_;
     TU_LockFreeQueue();
+    TU_LockFreeQueue(TU_LockFreeQueue<T> const &other) = delete;
+    TU_LockFreeQueue(TU_LockFreeQueue<T> &&other);
     ~TU_LockFreeQueue();
     void push(T value);
     bool pop(T *result);
 };
 
+
+template <typename T>
+TU_LockFreeQueue<T>::TU_LockFreeQueue(TU_LockFreeQueue<T> &&other) {
+    // NOTE: we consider that other is only accessed by one thread.
+    this->head_.store(other.head_);
+    other.head_.store({});
+    this->tail_.store(other.tail_);
+    other.tail_.store({});
+}
 
 template <typename T>
 TU_LockFreeQueue<T>::TU_LockFreeQueue() {

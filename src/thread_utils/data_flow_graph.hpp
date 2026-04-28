@@ -5,6 +5,8 @@
 
 struct TU_Graph;
 struct TU_GraphThreadGroup;
+struct TU_GraphWorker;
+struct TU_GraphState;
 
 using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, void*, tu_i64);
 
@@ -13,7 +15,17 @@ struct TU_GraphOperation {
     void *ctx = nullptr;
     void *data = nullptr;
     tu_i64 index = 0;
+    TU_GraphState *state;
 };
+
+struct TU_GraphState {
+    TU_Mutex dbg_mutex;
+
+    TU_Atomic<size_t> counter = 0;
+    TU_LockFreeQueue<TU_GraphOperation> queue = {};
+    void *ctx;
+};
+
 
 struct TU_GraphWorker {
     TU_Thread thread;
@@ -40,8 +52,8 @@ struct TU_GraphThreadGroup {
 struct TU_Graph {
     TU_Mutex mutex;
     TU_Cond cond;
-    TU_Atomic<size_t> operation_counter;
-    TU_Array<TU_GraphThreadGroup> groups;
+    TU_Atomic<tu_i64> operation_counter = 0; // we use a i64 instead of a u64 to detect overflow while debugging
+    TU_Array<TU_GraphThreadGroup> groups = {};
 };
 
 void tu_graph_init(TU_Graph *graph);
@@ -53,5 +65,7 @@ void tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
                         void *ctx, void *data, tu_i64 index);
+void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+                         TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);
 
 #endif

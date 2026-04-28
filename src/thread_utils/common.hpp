@@ -34,4 +34,18 @@ struct TU_ExecData {
     tu_i64 index;
 };
 
+#if defined(_MSC_VER)
+    #include <intrin.h>
+    #if defined(_M_IX86) || defined(_M_X64)
+        #define cross_platform_yield() _mm_pause()
+    #else
+        #define cross_platform_yield() YieldProcessor()
+    #endif
+#elif defined(__x86_64__) || defined(__i386__)
+    #include <emmintrin.h>
+    #define cross_platform_yield() _mm_pause()
+#else
+    #define cross_platform_yield() asm volatile("yield")
+#endif
+
 #endif

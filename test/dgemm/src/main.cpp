@@ -3,6 +3,7 @@
 #include <cassert>
 #include <tuple>
 #include <functional>
+#include <cblas.h>
 #include "thread_utils.hpp"
 #include "data.hpp"
 #include "timer.hpp"
@@ -78,6 +79,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_init(&graph);
 
+    openblas_set_num_threads(1);
     tu_graph_add_thread_group(&graph, 40);
 
     TU_GraphState product_state_cxt, sum_state_ctx;
@@ -133,14 +135,10 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         assert(b->cols == p->cols);
         assert(a->cols == b->rows);
 
-        for (size_t row = 0; row < p->rows; ++row) {
-            for (size_t col = 0; col < p->cols; ++col) {
-                (*p)(row, col) = 0;
-                for (size_t k = 0; k < a->cols; ++k) {
-                    (*p)(row, col) += (*a)(row, k) * (*b)(k, col);
-                }
-            }
-        }
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint)a->rows, (blasint)b->cols, (blasint)a->cols,
+                    1.f, (const double *)a->data, (blasint)a->cols, (const double *)b->data, (blasint)b->cols, 0,
+                    (double *)p->data, (blasint)p->cols);
+
         // TODO: this is tmp, we will implement proper memory management helpers later
         delete tiles; // tiles was dynamically allocated in the product state
         tu_graph_push_state(graph, 0, &sum_state_ctx, &run_lambda, &sum_state,

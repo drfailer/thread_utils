@@ -293,7 +293,7 @@ void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
 }
 
 void test_dgemm() {
-    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
+    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 1024;
     Matrix A(M, K), B(K, N), C(M, N), E(M, N);
     initialize_matrix(A);
     initialize_matrix(B);

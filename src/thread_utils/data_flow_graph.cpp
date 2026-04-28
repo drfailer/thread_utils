@@ -124,7 +124,6 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
         return 1;
     }
 
-    // printf("locking state\n");
     // op->state->dbg_mutex.lock();
     // op->exec(worker->group->graph, op->ctx, op->data, op->index);
     // op->state->dbg_mutex.unlock();

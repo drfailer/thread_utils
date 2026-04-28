@@ -2,6 +2,7 @@
 #define THREAD_UTILS_DATA_FLOW_GRAPH
 #include "common.hpp"
 #include "data_structures/lock_free_queue.hpp"
+#include "data_structures/lock_queue.hpp"
 
 struct TU_Graph;
 struct TU_GraphThreadGroup;
@@ -40,6 +41,7 @@ struct TU_GraphWorker {
 struct TU_GraphThreadGroup {
     TU_Sem sem = TU_Sem{0};
     TU_LockFreeQueue<TU_GraphOperation> queue = {};
+    // TU_LockQueue<TU_GraphOperation> queue = {};
     TU_Array<TU_GraphWorker> workers = {};
     TU_Graph *graph = nullptr;
     tu_u64 group_index = 0;

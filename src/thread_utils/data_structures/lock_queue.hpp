@@ -9,7 +9,13 @@ struct TU_LockQueue {
     std::queue<T> data;
     void push(T value);
     bool pop(T *result);
+    TU_LockQueue() = default;
+    TU_LockQueue(TU_LockQueue &&other);
 };
+
+template <typename T>
+TU_LockQueue<T>::TU_LockQueue(TU_LockQueue &&other)
+    : data(std::move(other.data)) {}
 
 template <typename T>
 void TU_LockQueue<T>::push(T value) {

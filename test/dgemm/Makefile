@@ -1,0 +1,23 @@
+CC=g++
+CXXFLAGS=-Wall -Wextra -Wuninitialized \
+		 -std=c++20 -MMD -O3 -fdiagnostics-color=auto \
+		 -I../../src/thread_utils/ -I../../common/
+LDFLAGS=-L../../build/lib -l:libthread_utils.a -latomic
+SRC=$(wildcard src/*.cpp)
+OBJ=$(addprefix build/,$(SRC:src/%.cpp=%.o))
+DEP=$(addprefix build/,$(SRC:src/%.cpp=%.d))
+
+prog: $(OBJ)
+	$(CC) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+build/%.o: src/%.cpp
+	@mkdir -p build/
+	$(CC) $(CXXFLAGS) -o $@ -c $<
+
+clean:
+	rm -rf build
+
+.PHONY run:
+	./prog
+
+-include $(DEP)

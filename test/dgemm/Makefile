@@ -1,4 +1,4 @@
-CC=g++
+CC=personal-g++
 CBLAS_INCLUDE_PATH=$(HOME)/Programming/usr/include/openblas
 CBLAS_LIBRARY_PATH=$(HOME)/Programming/usr/lib
 CXXFLAGS=-Wall -Wextra -Wuninitialized \

@@ -1,8 +1,8 @@
-CC=g++
+CC=personal-g++
 CXXFLAGS=-Wall -Wextra -Wuninitialized \
 		 -std=c++20 -fPIC -mcx16 -MMD -O3 -fdiagnostics-color=auto \
 		 -I./common/
-LDFLAGS=-l:libatomic.a
+LDFLAGS=-latomic
 SRC=$(wildcard src/**/*.cpp)
 OBJ=$(addprefix build/,$(SRC:src/%.cpp=%.o))
 DEP=$(addprefix build/,$(SRC:src/%.cpp=%.d))

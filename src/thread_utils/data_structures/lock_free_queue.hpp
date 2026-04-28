@@ -10,6 +10,8 @@
 #include "../common.hpp"
 #include <cassert>
 
+#define TU_LFQ_NODE_POOL
+
 template <typename T>
 struct TU_LockFreeQueueNode;
 
@@ -40,12 +42,17 @@ template <typename T>
 struct TU_LockFreeQueue {
     alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> head_;
     alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> tail_;
+    #ifdef TU_LFQ_NODE_POOL
+    alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> free_;
+    #endif // TU_LFQ_NODE_POOL
     TU_LockFreeQueue();
     TU_LockFreeQueue(TU_LockFreeQueue<T> const &other) = delete;
     TU_LockFreeQueue(TU_LockFreeQueue<T> &&other);
     ~TU_LockFreeQueue();
     void push(T value);
     bool pop(T *result);
+    private: TU_LockFreeQueueNode<T> *allocate_node();
+    private: void release_node(TU_LockFreeQueueNode<T> *node);
 };
 
 
@@ -60,7 +67,10 @@ TU_LockFreeQueue<T>::TU_LockFreeQueue(TU_LockFreeQueue<T> &&other) {
 
 template <typename T>
 TU_LockFreeQueue<T>::TU_LockFreeQueue() {
-    auto node = new TU_LockFreeQueueNode<T>();
+    static_assert(alignof(TU_LockFreeQueueNodePtr<T>) == 16, "NodePtr must be 16-byte aligned");
+    static_assert(sizeof(TU_LockFreeQueueNodePtr<T>) == 16, "NodePtr must be 16 bytes");
+    static_assert(sizeof(TU_Atomic<TU_LockFreeQueueNodePtr<T>>) == 16, "wrong atomic size");
+    auto node = allocate_node();
     this->head_.store({node, 0});
     this->tail_.store({node, 0});
     if (!this->head_.is_lock_free()) {
@@ -73,8 +83,17 @@ TU_LockFreeQueue<T>::~TU_LockFreeQueue() {
     for (TU_LockFreeQueueNodePtr<T> node = this->head_.load(); node.ptr != nullptr;) {
         TU_LockFreeQueueNodePtr<T> next = node.ptr->next;
         delete node.ptr;
+        node.ptr = nullptr;
         node = next;
     }
+    #ifdef TU_LFQ_NODE_POOL
+    for (TU_LockFreeQueueNodePtr<T> node = this->free_.load(); node.ptr != nullptr;) {
+        TU_LockFreeQueueNodePtr<T> next = node.ptr->next;
+        delete node.ptr;
+        node.ptr = nullptr;
+        node = next;
+    }
+    #endif // TU_LFQ_NODE_POOL
 }
 
 template <typename T>
@@ -133,8 +152,56 @@ bool TU_LockFreeQueue<T>::pop(T *result) {
             }
         }
     }
-    delete head.ptr;
+    release_node(head.ptr);
     return true;
 }
+
+#ifdef TU_LFQ_NODE_POOL
+template <typename T>
+TU_LockFreeQueueNode<T> *TU_LockFreeQueue<T>::allocate_node() {
+    TU_LockFreeQueueNodePtr<T> free;
+    TU_LockFreeQueueNodePtr<T> next;
+
+    for (;;) {
+        free = this->free_.load();
+        if (free.ptr == nullptr) {
+            // the pool is empty
+            return new TU_LockFreeQueueNode<T>();
+        }
+        next = free.ptr->next.load();
+        if (this->free_.compare_exchange_weak(free, {next.ptr, next.count + 1})) {
+            return free.ptr;
+        }
+        // the head has been stolen by another thread, so we retry
+    }
+}
+
+template <typename T>
+void TU_LockFreeQueue<T>::release_node(TU_LockFreeQueueNode<T> *node) {
+    assert(node != nullptr);
+    TU_LockFreeQueueNodePtr<T> free;
+
+    // TODO: add a counter and a max pool size so we don't keep increasing the
+    //       pool size infinitely
+
+    for (;;) {
+        free = this->free_.load();
+        node->next.store({free.ptr, free.count + 1});
+        if (this->free_.compare_exchange_weak(free, {node, free.count + 1})) {
+            break;
+        }
+    }
+}
+#else
+template <typename T>
+TU_LockFreeQueueNode<T> *TU_LockFreeQueue<T>::allocate_node() {
+    return new TU_LockFreeQueueNode<T>();
+}
+
+template <typename T>
+void TU_LockFreeQueue<T>::release_node(TU_LockFreeQueueNode<T> *node) {
+    delete node;
+}
+#endif // TU_LFQ_NODE_POOL
 
 #endif

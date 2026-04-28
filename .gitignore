@@ -1,2 +1,4 @@
 build/
 prog
+.gdb_history
+*.out

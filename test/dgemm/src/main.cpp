@@ -7,6 +7,7 @@
 #include "thread_utils.hpp"
 #include "data.hpp"
 #include "timer.hpp"
+#include "hedgehog_dgemm.hpp"
 
 void graph_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
@@ -68,8 +69,6 @@ void deallocate_tile(MatrixTile *tile) {
     delete tile;
 }
 
-enum class MatrixKind { A, B, C, P };
-
 void run_lambda(TU_Graph *graph, void *ctx, void *data, tu_i64 type) {
     auto lambda = (std::function<void(TU_Graph*, void*, void*, tu_i64)>*)ctx;
     lambda->operator()(graph, nullptr, data, type);
@@ -79,7 +78,6 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
     TU_Graph graph;
 
-    openblas_set_num_threads(1);
     tu_graph_init(&graph);
 
     tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
@@ -338,8 +336,34 @@ void test_dgemm() {
     printf("dgemm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
+void test_dgemm_hh() {
+    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
+    auto A = std::make_shared<AMat>(M, K);
+    auto B = std::make_shared<BMat>(K, N);
+    auto C = std::make_shared<CMat>(M, N);
+    initialize_matrix(*reinterpret_cast<Matrix*>(A.get()));
+    initialize_matrix(*reinterpret_cast<Matrix*>(B.get()));
+    zero_matrix(*reinterpret_cast<Matrix*>(C.get()));
+
+    printf("running hh dgemm...\n");
+    timer_start(dgemm_hh);
+    DgemmGraph graph(M, N, K, TILE_SIZE);
+    graph.executeGraph(true);
+    graph.pushData(A);
+    graph.pushData(B);
+    graph.pushData(C);
+    graph.finishPushingData();
+    graph.waitForTermination();
+    timer_end(dgemm_hh);
+    timer_report(dgemm_hh);
+
+    printf("dgemm_hh(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
+}
+
 int main(int, char **) {
+    openblas_set_num_threads(1);
     // test_hadamard();
+    test_dgemm_hh();
     test_dgemm();
     return 0;
 }

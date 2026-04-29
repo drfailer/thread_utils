@@ -76,7 +76,7 @@ void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
     assert(graph->started);
 
     TU_Stopwatch sw;
-    tu_prof_enqueue_begin(&graph->groups[group].prof_queue, &sw);
+    tu_prof_push_begin(&graph->groups[group].prof_queue, &sw);
     graph->operation_counter += 1;
     graph->groups[group].queue.push(TU_GraphOperation{
             .exec = exec,
@@ -85,39 +85,37 @@ void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
             .index = index,
             .state = state,
     });
-    tu_prof_enqueue_end(&graph->groups[group].prof_queue, &sw);
+    tu_prof_push_end(&graph->groups[group].prof_queue, &sw);
     graph->groups[group].sem.release();
 }
 
 void tu_graph_print_profile_infos(TU_Graph *graph) {
     for (auto const &group : graph->groups) {
         // enqueue
-        size_t enqueue_count = group.prof_queue.enqueue_count.load();
-        std::string enqueue_dur_ttl = tu_duration_to_string(TU_Duration(group.prof_queue.enqueue_dur.load()));
-        std::string enqueue_dur_avg = tu_duration_to_string(TU_Duration(group.prof_queue.enqueue_dur.load() / enqueue_count));
+        size_t push_count = group.prof_queue.push_count.load();
+        std::string push_dur_ttl = tu_duration_to_string(TU_Duration(group.prof_queue.push_dur.load()));
+        std::string push_dur_avg = tu_duration_to_string(TU_Duration(group.prof_queue.push_dur.load() / push_count));
         // dequeue
-        size_t dequeue_count = group.prof_queue.dequeue_count.load();
-        std::string dequeue_dur_ttl = tu_duration_to_string(TU_Duration(group.prof_queue.dequeue_dur.load()));
-        std::string dequeue_dur_avg = tu_duration_to_string(TU_Duration(group.prof_queue.dequeue_dur.load() / enqueue_count));
+        std::string pop_dur_ttl = tu_duration_to_string(TU_Duration(group.prof_queue.pop_dur.load()));
+        std::string pop_dur_avg = tu_duration_to_string(TU_Duration(group.prof_queue.pop_dur.load() / push_count));
 
-        printf("[profile group %ld] enqueue: avg = %s, ttl = %s (%ld), dequeue: avg = %s, ttl = %s (%ld).\n",
-               group.group_index, enqueue_dur_avg.c_str(), enqueue_dur_ttl.c_str(), enqueue_count,
-               dequeue_dur_avg.c_str(), dequeue_dur_ttl.c_str(), dequeue_count);
+        printf("[profile group %ld] push: avg = %s, ttl = %s; pop: avg = %s, ttl = %s (count = %ld).\n",
+               group.group_index, push_dur_avg.c_str(), push_dur_ttl.c_str(),
+               pop_dur_avg.c_str(), pop_dur_ttl.c_str(), push_count);
     }
 }
 
 void tu_graph_state_print_profile_infos(TU_GraphState *state, char const *state_name) {
-    size_t enqueue_count = state->prof_queue.enqueue_count.load();
-    std::string enqueue_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.enqueue_dur.load()));
-    std::string enqueue_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.enqueue_dur.load() / enqueue_count));
+    size_t push_count = state->prof_queue.push_count.load();
+    std::string push_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load()));
+    std::string push_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load() / push_count));
     // dequeue
-    size_t dequeue_count = state->prof_queue.dequeue_count.load();
-    std::string dequeue_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.dequeue_dur.load()));
-    std::string dequeue_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.dequeue_dur.load() / enqueue_count));
+    std::string pop_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.pop_dur.load()));
+    std::string pop_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.pop_dur.load() / push_count));
 
-    printf("[state %s] enqueue: avg = %s, ttl = %s (%ld), dequeue: avg = %s, ttl = %s (%ld).\n",
-           state_name, enqueue_dur_avg.c_str(), enqueue_dur_ttl.c_str(), enqueue_count,
-           dequeue_dur_avg.c_str(), dequeue_dur_ttl.c_str(), dequeue_count);
+    printf("[state %s] push: avg = %s, ttl = %s; pop: avg = %s, ttl = %s (count = %ld).\n",
+           state_name, push_dur_avg.c_str(), push_dur_ttl.c_str(),
+           pop_dur_avg.c_str(), pop_dur_ttl.c_str(), push_count);
 }
 
 static void group_init(TU_GraphThreadGroup *group) {
@@ -151,16 +149,16 @@ static void group_fini(TU_GraphThreadGroup *group) {
 
 static void state_push_op(TU_GraphState *state, TU_GraphOperation *op) {
     TU_Stopwatch sw;
-    tu_prof_enqueue_begin(&state->prof_queue, &sw);
+    tu_prof_push_begin(&state->prof_queue, &sw);
     state->queue.push(*op);
-    tu_prof_enqueue_end(&state->prof_queue, &sw);
+    tu_prof_push_end(&state->prof_queue, &sw);
 }
 
 static bool state_pop_op(TU_GraphState *state, TU_GraphOperation *op) {
     TU_Stopwatch sw;
-    tu_prof_dequeue_begin(&state->prof_queue, &sw);
+    tu_prof_pop_begin(&state->prof_queue, &sw);
     bool poped = state->queue.pop(op);
-    tu_prof_dequeue_end(&state->prof_queue, &sw);
+    tu_prof_pop_end(&state->prof_queue, &sw);
     return poped;
 }
 
@@ -217,9 +215,9 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
 
 static bool worker_pop_op(TU_GraphWorker *worker, TU_GraphOperation *op) {
     TU_Stopwatch sw;
-    tu_prof_dequeue_begin(&worker->group->prof_queue, &sw);
+    tu_prof_pop_begin(&worker->group->prof_queue, &sw);
     bool poped = worker->group->queue.pop(op);
-    tu_prof_dequeue_end(&worker->group->prof_queue, &sw);
+    tu_prof_pop_end(&worker->group->prof_queue, &sw);
     return poped;
 }
 

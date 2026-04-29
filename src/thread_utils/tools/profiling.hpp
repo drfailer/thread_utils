@@ -30,15 +30,14 @@ TU_Duration tu_stopwatch_stop_and_get_time(TU_Stopwatch *sw);
 /******************************************************************************/
 
 struct TU_ProfQueueInfos {
-    TU_Atomic<size_t> enqueue_dur;
-    TU_Atomic<size_t> enqueue_count;
-    TU_Atomic<size_t> dequeue_dur;
-    TU_Atomic<size_t> dequeue_count;
+    TU_Atomic<size_t> push_count;
+    TU_Atomic<size_t> push_dur;
+    TU_Atomic<size_t> pop_dur;
 };
 
-void tu_prof_enqueue_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
-void tu_prof_enqueue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
-void tu_prof_dequeue_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
-void tu_prof_dequeue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_push_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_push_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_pop_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_pop_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
 
 #endif

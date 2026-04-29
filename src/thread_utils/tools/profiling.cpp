@@ -58,22 +58,21 @@ TU_Duration tu_stopwatch_stop_and_get_time(TU_Stopwatch *sw) {
 /*                              queue profiling                               */
 /******************************************************************************/
 
-void tu_prof_enqueue_begin(TU_ProfQueueInfos *, TU_Stopwatch *sw) {
+void tu_prof_push_begin(TU_ProfQueueInfos *, TU_Stopwatch *sw) {
     tu_stopwatch_start(sw);
 }
 
-void tu_prof_enqueue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw) {
+void tu_prof_push_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw) {
     TU_Duration dur = tu_stopwatch_stop_and_get_time(sw);
-    infos->enqueue_dur += tu_stopwatch_stop_and_get_time(sw).count();
-    infos->enqueue_count++;
+    infos->push_dur += tu_stopwatch_stop_and_get_time(sw).count();
+    infos->push_count += 1;
 }
 
-void tu_prof_dequeue_begin(TU_ProfQueueInfos *, TU_Stopwatch *sw) {
+void tu_prof_pop_begin(TU_ProfQueueInfos *, TU_Stopwatch *sw) {
     tu_stopwatch_start(sw);
 }
 
-void tu_prof_dequeue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw) {
+void tu_prof_pop_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw) {
     TU_Duration dur = tu_stopwatch_stop_and_get_time(sw);
-    infos->dequeue_dur += tu_stopwatch_stop_and_get_time(sw).count();
-    infos->dequeue_count++;
+    infos->pop_dur += tu_stopwatch_stop_and_get_time(sw).count();
 }

@@ -1,9 +1,9 @@
 #ifndef THREAD_UTILS_THREAD_POOL
 #define THREAD_UTILS_THREAD_POOL
-#include "common.hpp"
-#include "tools.hpp"
-#include "data_structures/lock_free_queue.hpp"
-#include "data_structures/lock_queue.hpp"
+#include "profiling.hpp"
+#include "../common.hpp"
+#include "../data_structures/lock_free_queue.hpp"
+#include "../data_structures/lock_queue.hpp"
 
 struct TU_ThreadPool;
 

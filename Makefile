@@ -3,7 +3,7 @@ CXXFLAGS=-Wall -Wextra -Wuninitialized \
 		 -std=c++20 -fPIC -mcx16 -MMD -O3 -fdiagnostics-color=auto \
 		 -I./common/
 LDFLAGS=-latomic
-SRC=$(wildcard src/**/*.cpp)
+SRC=$(wildcard src/**/*.cpp) $(wildcard src/**/**/*.cpp)
 OBJ=$(addprefix build/,$(SRC:src/%.cpp=%.o))
 DEP=$(addprefix build/,$(SRC:src/%.cpp=%.d))
 
@@ -21,7 +21,7 @@ build/lib/libthread_utils.a: $(OBJ)
 	ar rcs $@ $^
 
 build/%.o: src/%.cpp
-	@mkdir -p build/thread_utils
+	@mkdir -p build/thread_utils/tools
 	$(CC) $(CXXFLAGS) -o $@ -c $<
 
 clean:

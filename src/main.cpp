@@ -88,9 +88,6 @@ void test_thread_pool() {
 
     timer_report(test_thread_pool)
     printf("\n");
-
-    tu_duration_print("enqueue time", static_cast<TU_Duration>(pool.enqueue_dur));
-    tu_duration_print("dequeue time", static_cast<TU_Duration>(pool.dequeue_dur));
 }
 
 void test_lock_free_queue() {
@@ -132,7 +129,10 @@ void test_work_steal_queue() {
 void test_graph() {
     TU_Graph graph;
     tu_graph_init(&graph);
-    defer(tu_graph_fini(&graph));
+    defer({
+        tu_graph_print_profile_infos(&graph);
+        tu_graph_fini(&graph);
+    });
 
     tu_graph_add_thread_group(&graph, 2);
 

@@ -247,6 +247,9 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_wait_completion(&graph);
     tu_graph_fini(&graph);
+    tu_graph_print_profile_infos(&graph);
+    tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
+    tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
 }
 
 void initialize_matrix(Matrix &m) {
@@ -299,7 +302,7 @@ void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
 }
 
 void test_dgemm() {
-    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 1024;
+    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
     Matrix A(M, K), B(K, N), C(M, N), E(M, N);
     initialize_matrix(A);
     initialize_matrix(B);

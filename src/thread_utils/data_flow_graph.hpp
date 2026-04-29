@@ -3,13 +3,36 @@
 #include "common.hpp"
 #include "data_structures/lock_free_queue.hpp"
 #include "data_structures/lock_queue.hpp"
+#include "tools/profiling.hpp"
+
+// TODO:
+// - For cuda, we may want to either bind a group to a stream or even a worker
+//   to a stream, therefore we will need to add some config functions.
 
 struct TU_Graph;
 struct TU_GraphThreadGroup;
 struct TU_GraphWorker;
 struct TU_GraphState;
+struct TU_GraphOperation;
 
 using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, void*, tu_i64);
+using TU_GraphOperationQueue = TU_LockFreeQueue<TU_GraphOperation>;
+// using TU_GraphOperationQueue = TU_LockQueue<TU_GraphOperation>;
+
+struct TU_GraphNodeAndType {
+    tu_u64 node_id;
+    tu_u64 type_id;
+};
+
+struct TU_GraphNode {
+    tu_u64 id;
+    TU_Array<TU_Array<TU_GraphNodeAndType>> successors;
+    // TODO: we need to test adding a queue here
+};
+
+struct TU_GraphData {
+    TU_Array<TU_GraphNode> nodes;
+};
 
 struct TU_GraphOperation {
     TU_GraphExecProc exec = nullptr;
@@ -23,10 +46,11 @@ struct TU_GraphState {
     TU_Mutex dbg_mutex;
 
     TU_Atomic<size_t> counter = 0;
-    TU_LockFreeQueue<TU_GraphOperation> queue = {};
+    TU_GraphOperationQueue queue = {};
     void *ctx;
+    //profiling
+    TU_ProfQueueInfos prof_queue;
 };
-
 
 struct TU_GraphWorker {
     TU_Thread thread;
@@ -44,11 +68,12 @@ struct TU_GraphWorker {
 
 struct TU_GraphThreadGroup {
     TU_Sem sem = TU_Sem{0};
-    TU_LockFreeQueue<TU_GraphOperation> queue = {};
-    // TU_LockQueue<TU_GraphOperation> queue = {};
+    TU_GraphOperationQueue queue = {};
     TU_Array<TU_GraphWorker> workers = {};
     TU_Graph *graph = nullptr;
     tu_u64 group_index = 0;
+    //profiling
+    TU_ProfQueueInfos prof_queue;
 
     // constructors
     TU_GraphThreadGroup() = default;
@@ -80,5 +105,8 @@ void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
                         void *ctx, void *data, tu_i64 index);
 void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
                          TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);
+
+void tu_graph_print_profile_infos(TU_Graph *graph);
+void tu_graph_state_print_profile_infos(TU_GraphState *state, char const *state_name);
 
 #endif

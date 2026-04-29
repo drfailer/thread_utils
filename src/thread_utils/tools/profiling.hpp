@@ -3,12 +3,15 @@
 #include <chrono>
 #include "../common.hpp"
 
-/******************************************************************************/
-/*                                 stopwatch                                  */
-/******************************************************************************/
 
 using TU_TimePoint = std::chrono::time_point<std::chrono::system_clock>;
 using TU_Duration = std::chrono::nanoseconds;
+
+std::string tu_duration_to_string(TU_Duration duration);
+
+/******************************************************************************/
+/*                                 stopwatch                                  */
+/******************************************************************************/
 
 struct TU_Stopwatch {
     TU_TimePoint begin;
@@ -22,6 +25,20 @@ void tu_stopwatch_stop(TU_Stopwatch *sw);
 TU_Duration tu_stopwatch_get_time(TU_Stopwatch *sw);
 TU_Duration tu_stopwatch_stop_and_get_time(TU_Stopwatch *sw);
 
-void tu_duration_print(char const *label, TU_Duration duration);
+/******************************************************************************/
+/*                              queue profiling                               */
+/******************************************************************************/
+
+struct TU_ProfQueueInfos {
+    TU_Atomic<size_t> enqueue_dur;
+    TU_Atomic<size_t> enqueue_count;
+    TU_Atomic<size_t> dequeue_dur;
+    TU_Atomic<size_t> dequeue_count;
+};
+
+void tu_prof_enqueue_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_enqueue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_dequeue_begin(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
+void tu_prof_dequeue_end(TU_ProfQueueInfos *infos, TU_Stopwatch *sw);
 
 #endif

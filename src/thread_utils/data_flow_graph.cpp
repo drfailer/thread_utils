@@ -9,7 +9,7 @@
  * the graph).
  */
 
-static void tu_graph_thread_group_init(TU_GraphThreadGroup *group, size_t thread_count);
+static void tu_graph_thread_group_init(TU_GraphThreadGroup *group);
 static void tu_graph_thread_group_fini(TU_GraphThreadGroup *group);
 static void tu_graph_worker_run(TU_GraphWorker *worker);
 
@@ -25,9 +25,19 @@ void tu_graph_fini(TU_Graph *graph) {
     }
 }
 
-static bool all_workers_parcked(TU_Graph *graph) {
+void tu_graph_start(TU_Graph *graph) {
+    if (graph->started) {
+        return;
+    }
     for (auto &group : graph->groups) {
-        for (auto &worker : group.workers) {
+        tu_graph_thread_group_init(&group);
+    }
+    graph->started = true;
+}
+
+static bool all_workers_parcked(TU_Graph *graph) {
+    for (auto const &group : graph->groups) {
+        for (auto const &worker : group.workers) {
             if (worker.parked.load() == false) {
                 return false;
             }
@@ -46,17 +56,19 @@ void tu_graph_wait_completion(TU_Graph *graph) {
 
 tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
     assert(graph != nullptr);
+    assert(!graph->started);
     graph->groups.push_back(TU_GraphThreadGroup{});
     graph->groups.back().graph = graph;
     graph->groups.back().group_index = graph->groups.size() - 1;
-    tu_graph_thread_group_init(&graph->groups.back(), thread_count);
-    return graph->groups.size() - 1;
+    graph->groups.back().workers.resize(thread_count);
+    return graph->groups.back().group_index;
 }
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
                         void *ctx, void *data, tu_i64 index) {
     assert(graph != nullptr);
     assert(group < graph->groups.size());
+    assert(graph->started);
     graph->operation_counter += 1;
     graph->groups[group].queue.push(TU_GraphOperation{
             .exec = exec,
@@ -72,6 +84,7 @@ void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
                          TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index) {
     assert(graph != nullptr);
     assert(group < graph->groups.size());
+    assert(graph->started);
     graph->operation_counter += 1;
     graph->groups[group].queue.push(TU_GraphOperation{
             .exec = exec,
@@ -83,17 +96,18 @@ void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
     graph->groups[group].sem.release();
 }
 
-static void tu_graph_thread_group_init(TU_GraphThreadGroup *group, size_t thread_count) {
-    printf("allocating %ld thread for group %p\n", thread_count, group);
+static void tu_graph_thread_group_init(TU_GraphThreadGroup *group) {
     assert(group != nullptr);
-    group->workers.reserve(thread_count);
-    for (size_t worker_index = 0; worker_index < thread_count; ++worker_index) {
-        group->workers.push_back(TU_GraphWorker{});
-        group->workers.back().group = group;
-        group->workers.back().worker_index = worker_index;
-        group->workers.back().parked = true;
-        group->workers.back().can_terminate = false;
-        group->workers.back().thread = TU_Thread(tu_graph_worker_run, &group->workers.back());
+    assert(group->graph != nullptr);
+    assert(group->graph->started == false);
+    assert(group->workers.size() > 0);
+    size_t worker_index = 0;
+    for (auto &worker : group->workers) {
+        worker.group = group;
+        worker.worker_index = worker_index++;
+        worker.parked = true;
+        worker.can_terminate = false;
+        worker.thread = TU_Thread(tu_graph_worker_run, &worker);
     }
 }
 
@@ -174,6 +188,8 @@ static void tu_graph_worker_process_operation_queue(TU_GraphWorker *worker) {
 }
 
 static void tu_graph_worker_run(TU_GraphWorker *worker) {
+    assert(worker->group != nullptr);
+    assert(worker->group->graph != nullptr);
     for (;;) {
         worker->parked.store(true);
         worker->group->graph->cond.notify_all();

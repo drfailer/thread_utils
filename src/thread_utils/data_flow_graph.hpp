@@ -33,9 +33,13 @@ struct TU_GraphWorker {
     TU_GraphThreadGroup *group = nullptr;
     tu_u64 worker_index = 0;
     TU_AtomicFlag parked = true, can_terminate = false;
+
+    // constructors
     TU_GraphWorker() = default;
+    TU_GraphWorker(TU_GraphWorker const &other) = delete;
     TU_GraphWorker(TU_GraphWorker &&other)
-        : group(other.group), worker_index(other.worker_index) {}
+        : thread(std::move(other.thread)), group(other.group), worker_index(other.worker_index),
+          parked(other.parked.load()), can_terminate(other.can_terminate.load()) {}
 };
 
 struct TU_GraphThreadGroup {
@@ -45,10 +49,13 @@ struct TU_GraphThreadGroup {
     TU_Array<TU_GraphWorker> workers = {};
     TU_Graph *graph = nullptr;
     tu_u64 group_index = 0;
+
+    // constructors
     TU_GraphThreadGroup() = default;
-    TU_GraphThreadGroup(TU_GraphThreadGroup const &other) = default;
+    TU_GraphThreadGroup(TU_GraphThreadGroup const &other) = delete;
     TU_GraphThreadGroup(TU_GraphThreadGroup &&other)
-        : sem(0), queue(std::move(other.queue)), workers(std::move(other.workers)) {}
+        : sem(0), queue(std::move(other.queue)), workers(std::move(other.workers)),
+          graph(other.graph), group_index(other.group_index) {}
 };
 
 struct TU_Graph {
@@ -56,6 +63,7 @@ struct TU_Graph {
     TU_Cond cond;
     TU_Atomic<tu_i64> operation_counter = 0; // we use a i64 instead of a u64 to detect overflow while debugging
     TU_Array<TU_GraphThreadGroup> groups = {};
+    bool started = false;
 };
 
 void tu_graph_init(TU_Graph *graph);
@@ -64,6 +72,9 @@ void tu_graph_fini(TU_Graph *graph);
 void tu_graph_wait_completion(TU_Graph *graph);
 
 tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
+
+// start the threads
+void tu_graph_start(TU_Graph *graph);
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
                         void *ctx, void *data, tu_i64 index);

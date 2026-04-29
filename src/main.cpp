@@ -136,6 +136,8 @@ void test_graph() {
 
     tu_graph_add_thread_group(&graph, 2);
 
+    tu_graph_start(&graph);
+
     struct TestData {
         size_t counter = 0;
     };

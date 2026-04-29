@@ -79,12 +79,21 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
     TU_Graph graph;
 
+    openblas_set_num_threads(1);
     tu_graph_init(&graph);
 
-    openblas_set_num_threads(1);
-    tu_u64 task_group = tu_graph_add_thread_group(&graph, 38);
-    // tu_u64 state_group = task_group;
-    tu_u64 state_group = tu_graph_add_thread_group(&graph, 2);
+    tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
+    tu_u64 product_state_group = tu_graph_add_thread_group(&graph, 1);
+    tu_u64 split_task_group = tu_graph_add_thread_group(&graph, 3);
+    tu_u64 product_task_group = tu_graph_add_thread_group(&graph, 40);
+    tu_u64 sum_task_group = tu_graph_add_thread_group(&graph, 10);
+
+    // tu_u64 unique_group = tu_graph_add_thread_group(&graph, 40);
+    // tu_u64 sum_state_group = unique_group;
+    // tu_u64 product_state_group = unique_group;
+    // tu_u64 split_task_group = unique_group;
+    // tu_u64 product_task_group = unique_group;
+    // tu_u64 sum_task_group = unique_group;
 
     tu_graph_start(&graph);
 
@@ -124,10 +133,10 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     .data = &M->operator()(i, j),
                 });
                 if (matrix_kind == MatrixKind::C) {
-                    tu_graph_push_state(graph, state_group, &sum_state_ctx, &run_lambda,
+                    tu_graph_push_state(graph, sum_state_group, &sum_state_ctx, &run_lambda,
                             &sum_state, &tiles_mem[type].back(), type);
                 } else {
-                    tu_graph_push_state(graph, state_group, &product_state_cxt, &run_lambda,
+                    tu_graph_push_state(graph, product_state_group, &product_state_cxt, &run_lambda,
                             &product_state, &tiles_mem[type].back(), type);
                 }
             }
@@ -147,7 +156,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
         // TODO: this is tmp, we will implement proper memory management helpers later
         delete tiles; // tiles was dynamically allocated in the product state
-        tu_graph_push_state(graph, state_group, &sum_state_ctx, &run_lambda, &sum_state,
+        tu_graph_push_state(graph, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state,
                 p, (size_t)MatrixKind::P);
     };
 
@@ -165,7 +174,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         // TODO: this is tmp, we will implement proper memory management helpers later
         delete tiles; // tiles was dynamically allocated in the sum state
         deallocate_tile(p);
-        tu_graph_push_state(graph, state_group, &sum_state_ctx, &run_lambda, &sum_state, c, (size_t)MatrixKind::C);
+        tu_graph_push_state(graph, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state, c, (size_t)MatrixKind::C);
     };
 
     std::vector<MatrixTile*> A_tiles(TM * TK);
@@ -184,7 +193,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     MatrixTile *b = B_tiles[tile->col * TN + col];
                     MatrixTile *p = allocate_tile(a->rows, b->cols, a->row, b->col);
                     auto tiles = new std::tuple<MatrixTile *, MatrixTile *, MatrixTile *>(a, b, p);
-                    tu_graph_push_task(graph, task_group, &run_lambda, &product_task, tiles, -1);
+                    tu_graph_push_task(graph, product_task_group, &run_lambda, &product_task, tiles, -1);
                 }
             }
         } break;
@@ -197,7 +206,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     MatrixTile *b = tile;
                     MatrixTile *p = allocate_tile(a->rows, b->cols, a->row, b->col);
                     auto tiles = new std::tuple<MatrixTile *, MatrixTile *, MatrixTile *>(a, b, p);
-                    tu_graph_push_task(graph, task_group, &run_lambda, &product_task, tiles, -1);
+                    tu_graph_push_task(graph, product_task_group, &run_lambda, &product_task, tiles, -1);
                 }
             }
         } break;
@@ -222,7 +231,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                 auto p = sum_queues[c_idx].back();
                 sum_queues[c_idx].pop_back();
                 auto tiles = new std::pair<MatrixTile *, MatrixTile *>(p, tile);
-                tu_graph_push_task(graph, task_group, &run_lambda, &sum_task, tiles, -1);
+                tu_graph_push_task(graph, sum_task_group, &run_lambda, &sum_task, tiles, -1);
             } else {
                 C_tiles[c_idx] = tile;
             }
@@ -233,7 +242,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                 auto c = C_tiles[c_idx];
                 C_tiles[c_idx] = nullptr;
                 auto tiles = new std::pair<MatrixTile *, MatrixTile *>(tile, c);
-                tu_graph_push_task(graph, task_group, &run_lambda, &sum_task, tiles, -1);
+                tu_graph_push_task(graph, sum_task_group, &run_lambda, &sum_task, tiles, -1);
             } else {
                 sum_queues[c_idx].push_back(tile);
             }
@@ -241,9 +250,9 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         }
     };
 
-    tu_graph_push_task(&graph, task_group, &run_lambda, &split_task, &A, (tu_i64)MatrixKind::A);
-    tu_graph_push_task(&graph, task_group, &run_lambda, &split_task, &B, (tu_i64)MatrixKind::B);
-    tu_graph_push_task(&graph, task_group, &run_lambda, &split_task, &C, (tu_i64)MatrixKind::C);
+    tu_graph_push_task(&graph, split_task_group, &run_lambda, &split_task, &A, (tu_i64)MatrixKind::A);
+    tu_graph_push_task(&graph, split_task_group, &run_lambda, &split_task, &B, (tu_i64)MatrixKind::B);
+    tu_graph_push_task(&graph, split_task_group, &run_lambda, &split_task, &C, (tu_i64)MatrixKind::C);
 
     tu_graph_wait_completion(&graph);
     tu_graph_fini(&graph);

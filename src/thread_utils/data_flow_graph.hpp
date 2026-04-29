@@ -63,7 +63,7 @@ void tu_graph_fini(TU_Graph *graph);
 
 void tu_graph_wait_completion(TU_Graph *graph);
 
-void tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
+tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
                         void *ctx, void *data, tu_i64 index);

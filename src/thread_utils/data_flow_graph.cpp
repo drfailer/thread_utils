@@ -44,12 +44,13 @@ void tu_graph_wait_completion(TU_Graph *graph) {
     });
 }
 
-void tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
+tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
     assert(graph != nullptr);
     graph->groups.push_back(TU_GraphThreadGroup{});
     graph->groups.back().graph = graph;
     graph->groups.back().group_index = graph->groups.size() - 1;
     tu_graph_thread_group_init(&graph->groups.back(), thread_count);
+    return graph->groups.size() - 1;
 }
 
 void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,

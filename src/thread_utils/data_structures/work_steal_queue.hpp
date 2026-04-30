@@ -1,19 +1,12 @@
 #ifndef THREAD_UTILS_DATA_STRUCTURES_WORK_STEAL_QUEUE
 #define THREAD_UTILS_DATA_STRUCTURES_WORK_STEAL_QUEUE
 #include "../common.hpp"
+#include "ring_buffer.hpp"
 
 enum TU_StealStatus {
     TU_STEAL_CODE_SUCCESS,
     TU_STEAL_CODE_EMPTY,
     TU_STEAL_CODE_FAILURE,
-};
-
-template <typename T, size_t SIZE=1024>
-struct TU_RingBuffer {
-    static_assert((SIZE & (SIZE - 1)) == 0, "SIZE must be a power of 2.");
-    static constexpr size_t MASK = SIZE - 1;
-    T buffer[SIZE];
-    T &operator[](size_t idx) { return buffer[idx & MASK]; }
 };
 
 template <typename T, size_t SIZE=1024>

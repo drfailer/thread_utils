@@ -25,6 +25,7 @@ void TU_LockQueue<T>::push(T value) {
 
 template <typename T>
 bool TU_LockQueue<T>::pop(T *result) {
+    assert(result != nullptr);
     TU_Lock lck(this->mutex);
     if (this->data.empty()) {
         return false;

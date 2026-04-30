@@ -80,11 +80,19 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_init(&graph);
 
+
+    // tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
+    // tu_u64 product_state_group = tu_graph_add_thread_group(&graph, 1);
+    // tu_u64 split_task_group = tu_graph_add_thread_group(&graph, 3);
+    // tu_u64 product_task_group = tu_graph_add_thread_group(&graph, 40);
+    // tu_u64 sum_task_group = tu_graph_add_thread_group(&graph, 10);
+
+    tu_u64 task_group = tu_graph_add_thread_group(&graph, 40);
     tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
-    tu_u64 product_state_group = tu_graph_add_thread_group(&graph, 1);
-    tu_u64 split_task_group = tu_graph_add_thread_group(&graph, 3);
-    tu_u64 product_task_group = tu_graph_add_thread_group(&graph, 40);
-    tu_u64 sum_task_group = tu_graph_add_thread_group(&graph, 10);
+    tu_u64 product_state_group =  tu_graph_add_thread_group(&graph, 1);
+    tu_u64 split_task_group = task_group;
+    tu_u64 product_task_group = task_group;
+    tu_u64 sum_task_group = task_group;
 
     // tu_u64 unique_group = tu_graph_add_thread_group(&graph, 40);
     // tu_u64 sum_state_group = unique_group;
@@ -254,9 +262,9 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_wait_completion(&graph);
     tu_graph_fini(&graph);
-    tu_graph_print_profile_infos(&graph);
-    tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
-    tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
+    // tu_graph_print_profile_infos(&graph);
+    // tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
+    // tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
 }
 
 void initialize_matrix(Matrix &m) {

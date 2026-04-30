@@ -5,6 +5,8 @@
 #include "thread_utils/thread_utils.hpp"
 #include "thread_utils/data_structures/lock_free_queue.hpp"
 #include "thread_utils/data_structures/work_steal_queue.hpp"
+#include "thread_utils/data_structures/finite_lock_free_queue.hpp"
+#include "thread_utils/data_structures/finite_overflow_queue.hpp"
 #include "defer.hpp"
 #include "timer.hpp"
 
@@ -161,11 +163,45 @@ void test_graph() {
     tu_graph_wait_completion(&graph);
 }
 
+void test_finite_lock_free_queue() {
+    TU_FiniteLockFreeQueue<int, 4> queue;
+
+    for (int i = 0; i < 4; ++i) {
+        assert(queue.push(i) == true);
+    }
+    assert(queue.push(4) == false);
+
+    int value = -1;
+    for (int i = 0; i < 4; ++i) {
+        assert(queue.pop(&value) == true);
+        assert(value == i);
+    }
+    assert(queue.pop(&value) == false);
+    printf("finite lock queue test success.\n");
+}
+
+void test_finite_overflow_queue() {
+    FiniteOverflowQueue<int, 4> queue;
+
+    for (int i = 0; i < 6; ++i) {
+        queue.push(i);
+    }
+
+    int value = -1;
+    for (int i = 0; i < 6; ++i) {
+        assert(queue.pop(&value) == true);
+        printf("%d\n", value);
+    }
+    printf("finite overflow queue test success.\n");
+}
+
 int main(int , char **) {
     // test_async_worker();
     // test_lock_free_queue();
     // test_work_steal_queue();
     // test_thread_pool();
-    test_graph();
+    // test_graph();
+    // test_finite_lock_free_queue();
+    test_finite_overflow_queue();
     return 0;
 }

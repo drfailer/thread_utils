@@ -6,55 +6,79 @@
 #ifndef THREAD_UTILS_DATA_STRUCTURES_FINITE_LOCK_FREE_QUEUE
 #define THREAD_UTILS_DATA_STRUCTURES_FINITE_LOCK_FREE_QUEUE
 #include "../common.hpp"
+#include "ring_buffer.hpp"
 
 // push at the end and pop at the start:
 //
 // queue:
 // [---############-----]
 //     ^           ^
-//     start       end
+//     head        tail
 //
 // empty queue:
 // [--------------------]
 //                 ^
-//                 start/end
+//                 head/tail
 
 template <typename T, size_t SIZE = 1024>
 struct TU_FiniteLockFreeQueue {
-    alignas(64) TU_Atomic<size_t> start = 0;
-    alignas(64) TU_Atomic<size_t> end = 0;
+    alignas(64) TU_Atomic<size_t> head = 0;
+    alignas(64) TU_Atomic<size_t> tail = 0;
+    alignas(64) TU_Atomic<size_t> write = 0;
     TU_RingBuffer<T, SIZE> buffer;
     bool push(T value);
     bool pop(T *result);
     TU_FiniteLockFreeQueue() = default;
     TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue const &) = delete;
     TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue &&other)
-        : start(other.start.load()), end(other.end.load()), buffer(std::move(other.buffer)) {}
+        : head(other.head.load()), tail(other.tail.load()),
+          write(other.write.load()), buffer(std::move(other.buffer)) {}
 };
 
 template <typename T, size_t SIZE>
 bool TU_FiniteLockFreeQueue<T, SIZE>::push(T value) {
-    size_t e = this->end.fetch_add(1, std::memory_order_acquire);
+    size_t w = this->write.load(std::memory_order_relaxed);
 
-    if ((e - this->start.load()) >= SIZE) {
-        // the queue is full, we cannot push
-        this->end.fetch_sub(1, std::memory_order_acquire);
-        return false;
+    // try to increment the write cursor and write the value
+    for (;;) {
+        size_t h = this->head.load(std::memory_order_acquire);
+
+        if ((w - h) >= SIZE) {
+            return false;
+        }
+        if (this->write.compare_exchange_weak(w, w + 1, std::memory_order_release)) {
+            this->buffer[w] = std::move(value);
+        }
     }
-    this->buffer[e] = std::move(value);
+
+    // now we wait until we can move the tail so the consumers can pop
+    for (;;) {
+        size_t t = w; // we use an additional variable to avoid changing w
+        if (this->tail.compare_exchange_weak(t, w + 1, std::memory_order_release)) {
+            break;
+        }
+        cross_platform_yield();
+    }
     return true;
 }
 
 template <typename T, size_t SIZE>
 bool TU_FiniteLockFreeQueue<T, SIZE>::pop(T *result) {
     assert(result != nullptr);
-    size_t s = this->start.fetch_add(1, std::memory_order_acquire);
+    size_t h = this->head.load(std::memory_order_relaxed);
 
-    if (s >= this->end.load()) {
-        this->start.fetch_sub(1, std::memory_order_acquire);
-        return false;
+    // we try to increment the head
+    for (;;) {
+        size_t t = this->tail.load(std::memory_order_acquire);
+        if (h >= t) {
+            // the queue is empty
+            return false;
+        }
+        if (this->head.compare_exchange_weak(h, h + 1, std::memory_order_release)) {
+            break;
+        }
     }
-    *result = std::move(this->buffer[s]);
+    *result = this->buffer[h];
     return true;
 }
 

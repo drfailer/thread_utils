@@ -3,6 +3,7 @@
 #include "common.hpp"
 #include "data_structures/lock_free_queue.hpp"
 #include "data_structures/lock_queue.hpp"
+#include "data_structures/finite_overflow_queue.hpp"
 #include "tools/profiling.hpp"
 
 // TODO:
@@ -16,8 +17,10 @@ struct TU_GraphState;
 struct TU_GraphOperation;
 
 using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, void*, tu_i64);
-using TU_GraphOperationQueue = TU_LockFreeQueue<TU_GraphOperation>;
+// TODO: create a new queue { overflow_queue: LockFreeQueue, queue: RingBufQueue }
+// using TU_GraphOperationQueue = TU_LockFreeQueue<TU_GraphOperation>;
 // using TU_GraphOperationQueue = TU_LockQueue<TU_GraphOperation>;
+using TU_GraphOperationQueue = TU_FiniteOverflowQueue<TU_GraphOperation, 1024>;
 
 struct TU_GraphNodeAndType {
     tu_u64 node_id;
@@ -57,6 +60,7 @@ struct TU_GraphWorker {
     TU_GraphThreadGroup *group = nullptr;
     tu_u64 worker_index = 0;
     TU_AtomicFlag parked = true, can_terminate = false;
+    // TODO: add a cache system (1 to 4 cached elements; thread safe; no state; process the cache before poping from the global queue)
 
     // constructors
     TU_GraphWorker() = default;

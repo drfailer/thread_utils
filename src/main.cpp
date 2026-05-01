@@ -181,7 +181,7 @@ void test_finite_lock_free_queue() {
 }
 
 void test_finite_overflow_queue() {
-    FiniteOverflowQueue<int, 4> queue;
+    TU_FiniteOverflowQueue<int, 4> queue;
 
     for (int i = 0; i < 6; ++i) {
         queue.push(i);

@@ -7,7 +7,7 @@
 #include "thread_utils.hpp"
 #include "data.hpp"
 #include "timer.hpp"
-#include "hedgehog_dgemm.hpp"
+// #include "hedgehog_dgemm.hpp"
 
 void graph_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
@@ -87,19 +87,19 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     // tu_u64 product_task_group = tu_graph_add_thread_group(&graph, 40);
     // tu_u64 sum_task_group = tu_graph_add_thread_group(&graph, 10);
 
-    tu_u64 task_group = tu_graph_add_thread_group(&graph, 40);
-    tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
-    tu_u64 product_state_group =  tu_graph_add_thread_group(&graph, 1);
-    tu_u64 split_task_group = task_group;
-    tu_u64 product_task_group = task_group;
-    tu_u64 sum_task_group = task_group;
+    // tu_u64 task_group = tu_graph_add_thread_group(&graph, 40);
+    // tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
+    // tu_u64 product_state_group =  tu_graph_add_thread_group(&graph, 1);
+    // tu_u64 split_task_group = task_group;
+    // tu_u64 product_task_group = task_group;
+    // tu_u64 sum_task_group = task_group;
 
-    // tu_u64 unique_group = tu_graph_add_thread_group(&graph, 40);
-    // tu_u64 sum_state_group = unique_group;
-    // tu_u64 product_state_group = unique_group;
-    // tu_u64 split_task_group = unique_group;
-    // tu_u64 product_task_group = unique_group;
-    // tu_u64 sum_task_group = unique_group;
+    tu_u64 unique_group = tu_graph_add_thread_group(&graph, 40);
+    tu_u64 sum_state_group = unique_group;
+    tu_u64 product_state_group = unique_group;
+    tu_u64 split_task_group = unique_group;
+    tu_u64 product_task_group = unique_group;
+    tu_u64 sum_task_group = unique_group;
 
     tu_graph_start(&graph);
 
@@ -262,9 +262,9 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_wait_completion(&graph);
     tu_graph_fini(&graph);
-    // tu_graph_print_profile_infos(&graph);
-    // tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
-    // tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
+    tu_graph_print_profile_infos(&graph);
+    tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
+    tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
 }
 
 void initialize_matrix(Matrix &m) {
@@ -344,34 +344,34 @@ void test_dgemm() {
     printf("dgemm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
-void test_dgemm_hh() {
-    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
-    auto A = std::make_shared<AMat>(M, K);
-    auto B = std::make_shared<BMat>(K, N);
-    auto C = std::make_shared<CMat>(M, N);
-    initialize_matrix(*reinterpret_cast<Matrix*>(A.get()));
-    initialize_matrix(*reinterpret_cast<Matrix*>(B.get()));
-    zero_matrix(*reinterpret_cast<Matrix*>(C.get()));
-
-    printf("running hh dgemm...\n");
-    timer_start(dgemm_hh);
-    DgemmGraph graph(M, N, K, TILE_SIZE);
-    graph.executeGraph(true);
-    graph.pushData(A);
-    graph.pushData(B);
-    graph.pushData(C);
-    graph.finishPushingData();
-    graph.waitForTermination();
-    timer_end(dgemm_hh);
-    timer_report(dgemm_hh);
-
-    printf("dgemm_hh(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
-}
+// void test_dgemm_hh() {
+//     size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
+//     auto A = std::make_shared<AMat>(M, K);
+//     auto B = std::make_shared<BMat>(K, N);
+//     auto C = std::make_shared<CMat>(M, N);
+//     initialize_matrix(*reinterpret_cast<Matrix*>(A.get()));
+//     initialize_matrix(*reinterpret_cast<Matrix*>(B.get()));
+//     zero_matrix(*reinterpret_cast<Matrix*>(C.get()));
+//
+//     printf("running hh dgemm...\n");
+//     timer_start(dgemm_hh);
+//     DgemmGraph graph(M, N, K, TILE_SIZE);
+//     graph.executeGraph(true);
+//     graph.pushData(A);
+//     graph.pushData(B);
+//     graph.pushData(C);
+//     graph.finishPushingData();
+//     graph.waitForTermination();
+//     timer_end(dgemm_hh);
+//     timer_report(dgemm_hh);
+//
+//     printf("dgemm_hh(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
+// }
 
 int main(int, char **) {
     openblas_set_num_threads(1);
     // test_hadamard();
-    test_dgemm_hh();
+    // test_dgemm_hh();
     test_dgemm();
     return 0;
 }

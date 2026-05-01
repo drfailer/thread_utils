@@ -22,9 +22,9 @@
 
 template <typename T, size_t SIZE = 1024>
 struct TU_FiniteLockFreeQueue {
-    alignas(64) TU_Atomic<size_t> head = 0;
-    alignas(64) TU_Atomic<size_t> tail = 0;
-    alignas(64) TU_Atomic<size_t> write = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> head = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> tail = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> write = 0;
     TU_RingBuffer<T, SIZE> buffer;
     bool push(T value);
     bool pop(T *result);

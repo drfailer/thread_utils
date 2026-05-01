@@ -7,7 +7,11 @@
 #include <atomic>
 #include <vector>
 #include <stdint.h>
+#include <new>
 
+// use to padd atomics in the queues
+// constexpr size_t CACHE_LINE = std::hardware_destructive_interference_size;
+constexpr size_t CACHE_LINE = 64;
 
 using TU_Thread = std::thread;
 using TU_Mutex = std::mutex;

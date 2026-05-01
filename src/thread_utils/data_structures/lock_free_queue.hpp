@@ -41,10 +41,10 @@ struct TU_LockFreeQueueNode {
 
 template <typename T>
 struct TU_LockFreeQueue {
-    alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> head_;
-    alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> tail_;
+    alignas(CACHE_LINE) TU_Atomic<TU_LockFreeQueueNodePtr<T>> head_;
+    alignas(CACHE_LINE) TU_Atomic<TU_LockFreeQueueNodePtr<T>> tail_;
     #ifdef TU_LFQ_NODE_POOL
-    alignas(64) TU_Atomic<TU_LockFreeQueueNodePtr<T>> free_;
+    alignas(CACHE_LINE) TU_Atomic<TU_LockFreeQueueNodePtr<T>> free_;
     #endif // TU_LFQ_NODE_POOL
     TU_LockFreeQueue();
     TU_LockFreeQueue(TU_LockFreeQueue<T> const &other) = delete;

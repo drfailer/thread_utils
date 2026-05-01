@@ -11,8 +11,8 @@ enum TU_StealStatus {
 
 template <typename T, size_t SIZE=1024>
 struct TU_WorkStealQueue {
-    alignas(64) TU_Atomic<size_t> top_ = 0;
-    alignas(64) TU_Atomic<size_t> bottom_ = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> top_ = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> bottom_ = 0;
     TU_RingBuffer<T, SIZE> buffer_;
 
     bool push(T value);

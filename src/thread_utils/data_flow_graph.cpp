@@ -64,13 +64,22 @@ tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
     return graph->groups.back().group_index;
 }
 
-void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
-                        void *ctx, void *data, tu_i64 index) {
-    tu_graph_push_state(graph, group, nullptr, exec, ctx, data, index);
+void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecProc exec,
+                        void *exec_ctx, void *data, tu_i64 index) {
+    assert(graph_ctx.worker != nullptr);
+    assert(graph_ctx.worker->group != nullptr);
+    tu_graph_push_op(graph_ctx.worker->group->graph, group, nullptr, exec, exec_ctx, data, index);
 }
 
-void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
-                         TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index) {
+void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphState *state,
+                         TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
+    assert(graph_ctx.worker != nullptr);
+    assert(graph_ctx.worker->group != nullptr);
+    tu_graph_push_op(graph_ctx.worker->group->graph, group, state, exec, exec_ctx, data, index);
+}
+
+void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+                      TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
     assert(graph != nullptr);
     assert(group < graph->groups.size());
     assert(graph->started);
@@ -80,7 +89,7 @@ void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
     graph->operation_counter += 1;
     graph->groups[group].queue.push(TU_GraphOperation{
             .exec = exec,
-            .ctx = ctx,
+            .exec_ctx = exec_ctx,
             .data = data,
             .index = index,
             .state = state,
@@ -173,7 +182,7 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
 
     // when the data does not belong to a state, we process it normally and we leave.
     if (op->state == nullptr) {
-        op->exec(worker->group->graph, op->ctx, op->data, op->index);
+        op->exec(TU_GraphContext{worker, op->state}, op->exec_ctx, op->data, op->index);
         return 1;
     }
 
@@ -191,7 +200,7 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
         // the thread takes the ownership of the state
         for (;;) {
             for (TU_GraphOperation local_op; state_pop_op(op->state, &local_op);) {
-                local_op.exec(worker->group->graph, local_op.ctx, local_op.data, local_op.index);
+                local_op.exec(TU_GraphContext{worker, local_op.state}, local_op.exec_ctx, local_op.data, local_op.index);
                 processed_operation_count += 1;
                 // memory_order_acq_rel makes sure that either we see the
                 // increment of another thread (avoid leaving too early), or

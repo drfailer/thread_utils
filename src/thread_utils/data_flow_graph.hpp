@@ -15,12 +15,18 @@ struct TU_GraphThreadGroup;
 struct TU_GraphWorker;
 struct TU_GraphState;
 struct TU_GraphOperation;
+struct TU_GraphContext;
 
-using TU_GraphExecProc = void (*)(TU_Graph *graph, void*, void*, tu_i64);
+using TU_GraphExecProc = void (*)(TU_GraphContext, void *, void *, tu_i64);
 // TODO: create a new queue { overflow_queue: LockFreeQueue, queue: RingBufQueue }
 // using TU_GraphOperationQueue = TU_LockFreeQueue<TU_GraphOperation>;
 // using TU_GraphOperationQueue = TU_LockQueue<TU_GraphOperation>;
 using TU_GraphOperationQueue = TU_FiniteOverflowQueue<TU_GraphOperation, 1024>;
+
+struct TU_GraphContext {
+    TU_GraphWorker *worker;
+    void *state;
+};
 
 struct TU_GraphNodeAndType {
     tu_u64 node_id;
@@ -31,6 +37,7 @@ struct TU_GraphNode {
     tu_u64 id;
     TU_Array<TU_Array<TU_GraphNodeAndType>> successors;
     // TODO: we need to test adding a queue here
+    // Note: the queue here should not be an operation queue (since the exec function and context are bound to the task)
 };
 
 struct TU_GraphData {
@@ -39,7 +46,7 @@ struct TU_GraphData {
 
 struct TU_GraphOperation {
     TU_GraphExecProc exec = nullptr;
-    void *ctx = nullptr;
+    void *exec_ctx = nullptr;
     void *data = nullptr;
     tu_i64 index = 0;
     TU_GraphState *state;
@@ -48,7 +55,7 @@ struct TU_GraphOperation {
 struct TU_GraphState {
     TU_Mutex dbg_mutex;
 
-    TU_Atomic<size_t> counter = 0;
+    alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
     TU_GraphOperationQueue queue = {};
     void *ctx;
     //profiling
@@ -88,9 +95,9 @@ struct TU_GraphThreadGroup {
 };
 
 struct TU_Graph {
+    alignas(CACHE_LINE) TU_Atomic<tu_i64> operation_counter = 0; // we use a i64 instead of a u64 to detect overflow while debugging
     TU_Mutex mutex;
     TU_Cond cond;
-    TU_Atomic<tu_i64> operation_counter = 0; // we use a i64 instead of a u64 to detect overflow while debugging
     TU_Array<TU_GraphThreadGroup> groups = {};
     bool started = false;
 };
@@ -105,10 +112,12 @@ tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count);
 // start the threads
 void tu_graph_start(TU_Graph *graph);
 
-void tu_graph_push_task(TU_Graph *graph, tu_u64 group, TU_GraphExecProc exec,
-                        void *ctx, void *data, tu_i64 index);
+void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecProc exec,
+                        void *exec_ctx, void *data, tu_i64 index);
 void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
-                         TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);
+                         TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index);
+void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+                      TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);
 
 void tu_graph_print_profile_infos(TU_Graph *graph);
 void tu_graph_state_print_profile_infos(TU_GraphState *state, char const *state_name);

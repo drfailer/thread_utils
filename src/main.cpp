@@ -128,30 +128,30 @@ void test_work_steal_queue() {
     }
 }
 
-void test_graph() {
-    TU_Graph graph;
-    tu_graph_init(&graph);
+void test_tm() {
+    TU_TaskManager tm;
+    tu_tm_init(&tm);
     defer({
-        tu_graph_print_profile_infos(&graph);
-        tu_graph_fini(&graph);
+        tu_tm_print_profile_infos(&tm);
+        tu_tm_fini(&tm);
     });
 
-    tu_graph_add_thread_group(&graph, 2);
+    tu_tm_add_thread_group(&tm, 2);
 
-    tu_graph_start(&graph);
+    tu_tm_start(&tm);
 
     struct TestData {
         size_t counter = 0;
     };
     TestData data;
-    tu_graph_push_op(&graph, 0, nullptr, [](TU_GraphContext ctx, void *, void *rawdata, tu_i64) {
+    tu_tm_push_op(&tm, 0, nullptr, [](TU_TaskManagerContext ctx, void *, void *rawdata, tu_i64) {
         auto data = (TestData*)rawdata;
         data->counter += 1;
         using namespace std::literals::chrono_literals;
         std::this_thread::sleep_for(0.2s);
         printf("data.counter = %ld\n", data->counter);
         for (size_t i = 0; i < 10; ++i) {
-            tu_graph_push_task(ctx, 0, [](TU_GraphContext, void *, void *rawdata, tu_i64 index) {
+            tu_tm_push_task(ctx, 0, [](TU_TaskManagerContext, void *, void *rawdata, tu_i64 index) {
                 auto data = (TestData*)rawdata;
                 using namespace std::literals::chrono_literals;
                 std::this_thread::sleep_for(0.2s);
@@ -160,7 +160,7 @@ void test_graph() {
         }
     }, nullptr, &data, 0);
 
-    tu_graph_wait_completion(&graph);
+    tu_tm_wait_completion(&tm);
 }
 
 void test_finite_lock_free_queue() {
@@ -200,7 +200,7 @@ int main(int , char **) {
     // test_lock_free_queue();
     // test_work_steal_queue();
     // test_thread_pool();
-    test_graph();
+    test_tm();
     // test_finite_lock_free_queue();
     // test_finite_overflow_queue();
     return 0;

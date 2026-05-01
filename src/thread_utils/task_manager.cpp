@@ -1,42 +1,42 @@
-#include "data_flow_graph.hpp"
+#include "task_manager.hpp"
 #include <cassert>
 #include <stdio.h>
 
 /*
  * The tasks effectively push operations to the queue (task and data), and not
- * data directly. However, we can still model an actual data-flow graph
+ * data directly. However, we can still model an actual data-flow tm
  * representation that will decide what task to push (or nothing for the end of
- * the graph).
+ * the tm).
  */
 
-static void group_init(TU_GraphThreadGroup *group);
-static void group_fini(TU_GraphThreadGroup *group);
-static void worker_run(TU_GraphWorker *worker);
+static void group_init(TU_TaskManagerThreadGroup *group);
+static void group_fini(TU_TaskManagerThreadGroup *group);
+static void worker_run(TU_TaskManagerWorker *worker);
 
-void tu_graph_init(TU_Graph *graph) {
-    assert(graph != nullptr);
-    graph->operation_counter = 0;
+void tu_tm_init(TU_TaskManager *tm) {
+    assert(tm != nullptr);
+    tm->operation_counter = 0;
 }
 
-void tu_graph_fini(TU_Graph *graph) {
-    assert(graph != nullptr);
-    for (auto &group : graph->groups) {
+void tu_tm_fini(TU_TaskManager *tm) {
+    assert(tm != nullptr);
+    for (auto &group : tm->groups) {
         group_fini(&group);
     }
 }
 
-void tu_graph_start(TU_Graph *graph) {
-    if (graph->started) {
+void tu_tm_start(TU_TaskManager *tm) {
+    if (tm->started) {
         return;
     }
-    for (auto &group : graph->groups) {
+    for (auto &group : tm->groups) {
         group_init(&group);
     }
-    graph->started = true;
+    tm->started = true;
 }
 
-static bool all_workers_parcked(TU_Graph *graph) {
-    for (auto const &group : graph->groups) {
+static bool all_workers_parcked(TU_TaskManager *tm) {
+    for (auto const &group : tm->groups) {
         for (auto const &worker : group.workers) {
             if (worker.parked.load() == false) {
                 return false;
@@ -46,60 +46,60 @@ static bool all_workers_parcked(TU_Graph *graph) {
     return true;
 }
 
-void tu_graph_wait_completion(TU_Graph *graph) {
-    assert(graph != nullptr);
-    TU_Lock lck(graph->mutex);
-    graph->cond.wait(lck, [&]() {
-        return all_workers_parcked(graph) && graph->operation_counter.load() == 0;
+void tu_tm_wait_completion(TU_TaskManager *tm) {
+    assert(tm != nullptr);
+    TU_Lock lck(tm->mutex);
+    tm->cond.wait(lck, [&]() {
+        return all_workers_parcked(tm) && tm->operation_counter.load() == 0;
     });
 }
 
-tu_u64 tu_graph_add_thread_group(TU_Graph *graph, size_t thread_count) {
-    assert(graph != nullptr);
-    assert(!graph->started);
-    graph->groups.push_back(TU_GraphThreadGroup{});
-    graph->groups.back().graph = graph;
-    graph->groups.back().group_index = graph->groups.size() - 1;
-    graph->groups.back().workers.resize(thread_count);
-    return graph->groups.back().group_index;
+tu_u64 tu_tm_add_thread_group(TU_TaskManager *tm, size_t thread_count) {
+    assert(tm != nullptr);
+    assert(!tm->started);
+    tm->groups.push_back(TU_TaskManagerThreadGroup{});
+    tm->groups.back().tm = tm;
+    tm->groups.back().group_index = tm->groups.size() - 1;
+    tm->groups.back().workers.resize(thread_count);
+    return tm->groups.back().group_index;
 }
 
-void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecProc exec,
+void tu_tm_push_task(TU_TaskManagerContext tm_ctx, tu_u64 group, TU_TaskManagerExecProc exec,
                         void *exec_ctx, void *data, tu_i64 index) {
-    assert(graph_ctx.worker != nullptr);
-    assert(graph_ctx.worker->group != nullptr);
-    tu_graph_push_op(graph_ctx.worker->group->graph, group, nullptr, exec, exec_ctx, data, index);
+    assert(tm_ctx.worker != nullptr);
+    assert(tm_ctx.worker->group != nullptr);
+    tu_tm_push_op(tm_ctx.worker->group->tm, group, nullptr, exec, exec_ctx, data, index);
 }
 
-void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphStateContext *state,
-                         TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
-    assert(graph_ctx.worker != nullptr);
-    assert(graph_ctx.worker->group != nullptr);
-    tu_graph_push_op(graph_ctx.worker->group->graph, group, state, exec, exec_ctx, data, index);
+void tu_tm_push_state(TU_TaskManagerContext tm_ctx, tu_u64 group, TU_TaskManagerStateContext *state,
+                         TU_TaskManagerExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
+    assert(tm_ctx.worker != nullptr);
+    assert(tm_ctx.worker->group != nullptr);
+    tu_tm_push_op(tm_ctx.worker->group->tm, group, state, exec, exec_ctx, data, index);
 }
 
-void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphStateContext *state,
-                      TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
-    assert(graph != nullptr);
-    assert(group < graph->groups.size());
-    assert(graph->started);
+void tu_tm_push_op(TU_TaskManager *tm, tu_u64 group, TU_TaskManagerStateContext *state,
+                      TU_TaskManagerExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
+    assert(tm != nullptr);
+    assert(group < tm->groups.size());
+    assert(tm->started);
 
     TU_Stopwatch sw;
-    tu_prof_push_begin(&graph->groups[group].prof_queue, &sw);
-    graph->operation_counter += 1;
-    graph->groups[group].queue.push(TU_GraphOperation{
+    tu_prof_push_begin(&tm->groups[group].prof_queue, &sw);
+    tm->operation_counter += 1;
+    tm->groups[group].queue.push(TU_TaskManagerOperation{
             .exec = exec,
             .exec_ctx = exec_ctx,
             .data = data,
             .index = index,
             .state = state,
     });
-    tu_prof_push_end(&graph->groups[group].prof_queue, &sw);
-    graph->groups[group].sem.release();
+    tu_prof_push_end(&tm->groups[group].prof_queue, &sw);
+    tm->groups[group].sem.release();
 }
 
-void tu_graph_print_profile_infos(TU_Graph *graph) {
-    for (auto const &group : graph->groups) {
+void tu_tm_print_profile_infos(TU_TaskManager *tm) {
+    for (auto const &group : tm->groups) {
         // enqueue
         size_t push_count = group.prof_queue.push_count.load();
         std::string push_dur_ttl = tu_duration_to_string(TU_Duration(group.prof_queue.push_dur.load()));
@@ -114,7 +114,7 @@ void tu_graph_print_profile_infos(TU_Graph *graph) {
     }
 }
 
-void tu_graph_state_print_profile_infos(TU_GraphStateContext *state, char const *state_name) {
+void tu_tm_state_print_profile_infos(TU_TaskManagerStateContext *state, char const *state_name) {
     size_t push_count = state->prof_queue.push_count.load();
     std::string push_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load()));
     std::string push_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load() / push_count));
@@ -127,10 +127,10 @@ void tu_graph_state_print_profile_infos(TU_GraphStateContext *state, char const 
            pop_dur_avg.c_str(), pop_dur_ttl.c_str(), push_count);
 }
 
-static void group_init(TU_GraphThreadGroup *group) {
+static void group_init(TU_TaskManagerThreadGroup *group) {
     assert(group != nullptr);
-    assert(group->graph != nullptr);
-    assert(group->graph->started == false);
+    assert(group->tm != nullptr);
+    assert(group->tm->started == false);
     assert(group->workers.size() > 0);
 
     size_t worker_index = 0;
@@ -143,7 +143,7 @@ static void group_init(TU_GraphThreadGroup *group) {
     }
 }
 
-static void group_fini(TU_GraphThreadGroup *group) {
+static void group_fini(TU_TaskManagerThreadGroup *group) {
     assert(group != nullptr);
     for (auto &worker : group->workers) {
         worker.can_terminate.store(true);
@@ -156,14 +156,14 @@ static void group_fini(TU_GraphThreadGroup *group) {
     }
 }
 
-static void state_push_op(TU_GraphStateContext *state, TU_GraphOperation *op) {
+static void state_push_op(TU_TaskManagerStateContext *state, TU_TaskManagerOperation *op) {
     TU_Stopwatch sw;
     tu_prof_push_begin(&state->prof_queue, &sw);
     state->queue.push(*op);
     tu_prof_push_end(&state->prof_queue, &sw);
 }
 
-static bool state_pop_op(TU_GraphStateContext *state, TU_GraphOperation *op) {
+static bool state_pop_op(TU_TaskManagerStateContext *state, TU_TaskManagerOperation *op) {
     TU_Stopwatch sw;
     tu_prof_pop_begin(&state->prof_queue, &sw);
     bool poped = state->queue.pop(op);
@@ -176,18 +176,18 @@ static bool state_pop_op(TU_GraphStateContext *state, TU_GraphOperation *op) {
 // parallel task, however, it can return 0 or N when the operation belongs to a
 // state (depending on if the thread was able to take the ownership of the
 // state).
-static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_GraphOperation *op) {
+static size_t tu_tm_worker_process_operation(TU_TaskManagerWorker *worker, TU_TaskManagerOperation *op) {
     assert(worker != nullptr);
     assert(op != nullptr);
 
     // when the data does not belong to a state, we process it normally and we leave.
     if (op->state == nullptr) {
-        op->exec(TU_GraphContext{worker, op->state}, op->exec_ctx, op->data, op->index);
+        op->exec(TU_TaskManagerContext{worker, op->state}, op->exec_ctx, op->data, op->index);
         return 1;
     }
 
     // op->state->dbg_mutex.lock();
-    // op->exec(worker->group->graph, op->ctx, op->data, op->index);
+    // op->exec(worker->group->tm, op->ctx, op->data, op->index);
     // op->state->dbg_mutex.unlock();
     // return 1;
 
@@ -199,8 +199,8 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
     if (op->state->counter.fetch_add(1, std::memory_order_acq_rel) == 0) {
         // the thread takes the ownership of the state
         for (;;) {
-            for (TU_GraphOperation local_op; state_pop_op(op->state, &local_op);) {
-                local_op.exec(TU_GraphContext{worker, local_op.state}, local_op.exec_ctx, local_op.data, local_op.index);
+            for (TU_TaskManagerOperation local_op; state_pop_op(op->state, &local_op);) {
+                local_op.exec(TU_TaskManagerContext{worker, local_op.state}, local_op.exec_ctx, local_op.data, local_op.index);
                 processed_operation_count += 1;
                 // memory_order_acq_rel makes sure that either we see the
                 // increment of another thread (avoid leaving too early), or
@@ -222,7 +222,7 @@ static size_t tu_graph_worker_process_operation(TU_GraphWorker *worker, TU_Graph
     return 0;
 }
 
-static bool worker_pop_op(TU_GraphWorker *worker, TU_GraphOperation *op) {
+static bool worker_pop_op(TU_TaskManagerWorker *worker, TU_TaskManagerOperation *op) {
     TU_Stopwatch sw;
     tu_prof_pop_begin(&worker->group->prof_queue, &sw);
     bool poped = worker->group->queue.pop(op);
@@ -230,30 +230,30 @@ static bool worker_pop_op(TU_GraphWorker *worker, TU_GraphOperation *op) {
     return poped;
 }
 
-static void tu_graph_worker_process_operation_queue(TU_GraphWorker *worker) {
+static void tu_tm_worker_process_operation_queue(TU_TaskManagerWorker *worker) {
     assert(worker != nullptr);
     assert(worker->group != nullptr);
-    assert(worker->group->graph != nullptr);
+    assert(worker->group->tm != nullptr);
     size_t processed_operation_count = 0;
-    for (TU_GraphOperation op = {}; worker_pop_op(worker, &op);) {
-        processed_operation_count += tu_graph_worker_process_operation(worker, &op);
+    for (TU_TaskManagerOperation op = {}; worker_pop_op(worker, &op);) {
+        processed_operation_count += tu_tm_worker_process_operation(worker, &op);
     }
-    worker->group->graph->operation_counter -= processed_operation_count;
-    assert(worker->group->graph->operation_counter.load() >= 0);
+    worker->group->tm->operation_counter -= processed_operation_count;
+    assert(worker->group->tm->operation_counter.load() >= 0);
 }
 
-static void worker_run(TU_GraphWorker *worker) {
+static void worker_run(TU_TaskManagerWorker *worker) {
     assert(worker->group != nullptr);
-    assert(worker->group->graph != nullptr);
+    assert(worker->group->tm != nullptr);
     for (;;) {
         worker->parked.store(true);
-        worker->group->graph->cond.notify_all();
+        worker->group->tm->cond.notify_all();
         worker->group->sem.acquire();
         if (worker->can_terminate.load()) {
             break;
         }
         worker->parked.store(false);
-        tu_graph_worker_process_operation_queue(worker);
+        tu_tm_worker_process_operation_queue(worker);
     }
 }
 

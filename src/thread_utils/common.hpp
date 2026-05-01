@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <vector>
+#include <map>
 #include <stdint.h>
 #include <new>
 
@@ -26,6 +27,9 @@ using TU_Atomic = std::atomic<T>;
 
 template <typename T>
 using TU_Array = std::vector<T>;
+
+template <typename K, typename V>
+using TU_Map = std::map<K, V>;
 
 using tu_i64 = int64_t;
 using tu_u64 = uint64_t;

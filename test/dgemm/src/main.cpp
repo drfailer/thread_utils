@@ -9,15 +9,15 @@
 #include "timer.hpp"
 // #include "hedgehog_dgemm.hpp"
 
-void graph_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
+void tm_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
-    TU_Graph graph;
+    TU_TaskManager tm;
 
-    tu_graph_init(&graph);
+    tu_tm_init(&tm);
 
-    tu_graph_add_thread_group(&graph, 10);
+    tu_tm_add_thread_group(&tm, 10);
 
-    tu_graph_start(&graph);
+    tu_tm_start(&tm);
 
     for (size_t i = 0; i < C.rows; i += tile_size) {
         for (size_t j = 0; j < C.cols; j += tile_size) {
@@ -36,7 +36,7 @@ void graph_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
             tiles.back().a.data = &A(i, j);
             tiles.back().b.data = &B(i, j);
             tiles.back().c.data = &C(i, j);
-            tu_graph_push_op(&graph, 0, nullptr, [](TU_GraphContext, void *, void *rawdata, tu_i64) {
+            tu_tm_push_op(&tm, 0, nullptr, [](TU_TaskManagerContext, void *, void *rawdata, tu_i64) {
                 assert(rawdata != nullptr);
                 auto data = (TileTriplet*)rawdata;
                 for (size_t i = 0; i < data->c.rows; ++i) {
@@ -48,8 +48,8 @@ void graph_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         }
     }
 
-    tu_graph_wait_completion(&graph);
-    tu_graph_fini(&graph);
+    tu_tm_wait_completion(&tm);
+    tu_tm_fini(&tm);
 }
 
 MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
@@ -69,41 +69,41 @@ void deallocate_tile(MatrixTile *tile) {
     delete tile;
 }
 
-void run_lambda(TU_GraphContext graph_ctx, void *ctx, void *data, tu_i64 type) {
-    auto lambda = (std::function<void(TU_GraphContext, void*, void*, tu_i64)>*)ctx;
-    lambda->operator()(graph_ctx, nullptr, data, type);
+void run_lambda(TU_TaskManagerContext tm_ctx, void *ctx, void *data, tu_i64 type) {
+    auto lambda = (std::function<void(TU_TaskManagerContext, void*, void*, tu_i64)>*)ctx;
+    lambda->operator()(tm_ctx, nullptr, data, type);
 }
 
-void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
+void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     std::vector<TileTriplet> tiles;
-    TU_Graph graph;
+    TU_TaskManager tm;
 
-    tu_graph_init(&graph);
+    tu_tm_init(&tm);
 
 
-    // tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
-    // tu_u64 product_state_group = tu_graph_add_thread_group(&graph, 1);
-    // tu_u64 split_task_group = tu_graph_add_thread_group(&graph, 3);
-    // tu_u64 product_task_group = tu_graph_add_thread_group(&graph, 40);
-    // tu_u64 sum_task_group = tu_graph_add_thread_group(&graph, 10);
+    // tu_u64 sum_state_group = tu_tm_add_thread_group(&tm, 1);
+    // tu_u64 product_state_group = tu_tm_add_thread_group(&tm, 1);
+    // tu_u64 split_task_group = tu_tm_add_thread_group(&tm, 3);
+    // tu_u64 product_task_group = tu_tm_add_thread_group(&tm, 40);
+    // tu_u64 sum_task_group = tu_tm_add_thread_group(&tm, 10);
 
-    // tu_u64 task_group = tu_graph_add_thread_group(&graph, 40);
-    // tu_u64 sum_state_group = tu_graph_add_thread_group(&graph, 1);
-    // tu_u64 product_state_group =  tu_graph_add_thread_group(&graph, 1);
+    // tu_u64 task_group = tu_tm_add_thread_group(&tm, 40);
+    // tu_u64 sum_state_group = tu_tm_add_thread_group(&tm, 1);
+    // tu_u64 product_state_group =  tu_tm_add_thread_group(&tm, 1);
     // tu_u64 split_task_group = task_group;
     // tu_u64 product_task_group = task_group;
     // tu_u64 sum_task_group = task_group;
 
-    tu_u64 unique_group = tu_graph_add_thread_group(&graph, 40);
+    tu_u64 unique_group = tu_tm_add_thread_group(&tm, 40);
     tu_u64 sum_state_group = unique_group;
     tu_u64 product_state_group = unique_group;
     tu_u64 split_task_group = unique_group;
     tu_u64 product_task_group = unique_group;
     tu_u64 sum_task_group = unique_group;
 
-    tu_graph_start(&graph);
+    tu_tm_start(&tm);
 
-    TU_GraphStateContext product_state_cxt, sum_state_ctx;
+    TU_TaskManagerStateContext product_state_cxt, sum_state_ctx;
 
     assert(A.rows == C.rows);
     assert(B.cols == C.cols);
@@ -113,14 +113,14 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     size_t TN = C.cols / tile_size + (C.cols % tile_size == 0 ? 0 : 1);
     size_t TK = A.cols / tile_size + (A.cols % tile_size == 0 ? 0 : 1);
 
-    std::function<void(TU_GraphContext, void*, void*, tu_i64)> split_task, product_task,
+    std::function<void(TU_TaskManagerContext, void*, void*, tu_i64)> split_task, product_task,
         sum_task, product_state, sum_state;
 
     std::vector<MatrixTile> tiles_mem[3]; // tiles memory for A, B, C and P
     tiles_mem[0].reserve(TM * TK);
     tiles_mem[1].reserve(TK * TN);
     tiles_mem[2].reserve(TM * TN);
-    split_task = [&](TU_GraphContext graph_ctx, void *, void *rawdata, tu_i64 type) {
+    split_task = [&](TU_TaskManagerContext tm_ctx, void *, void *rawdata, tu_i64 type) {
         auto M = (Matrix*)rawdata;
         auto matrix_kind = (MatrixKind)type;
         for (size_t i = 0; i < M->rows; i += tile_size) {
@@ -139,17 +139,17 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     .data = &M->operator()(i, j),
                 });
                 if (matrix_kind == MatrixKind::C) {
-                    tu_graph_push_state(graph_ctx, sum_state_group, &sum_state_ctx, &run_lambda,
+                    tu_tm_push_state(tm_ctx, sum_state_group, &sum_state_ctx, &run_lambda,
                             &sum_state, &tiles_mem[type].back(), type);
                 } else {
-                    tu_graph_push_state(graph_ctx, product_state_group, &product_state_cxt, &run_lambda,
+                    tu_tm_push_state(tm_ctx, product_state_group, &product_state_cxt, &run_lambda,
                             &product_state, &tiles_mem[type].back(), type);
                 }
             }
         }
     };
 
-    product_task = [&](TU_GraphContext graph_ctx, void *, void *rawdata, tu_i64) {
+    product_task = [&](TU_TaskManagerContext tm_ctx, void *, void *rawdata, tu_i64) {
         auto tiles = (std::tuple<MatrixTile *, MatrixTile *, MatrixTile *>*)rawdata;
         auto [a, b, p] = *tiles;
         assert(a->rows == p->rows);
@@ -162,11 +162,11 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
         // TODO: this is tmp, we will implement proper memory management helpers later
         delete tiles; // tiles was dynamically allocated in the product state
-        tu_graph_push_state(graph_ctx, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state,
+        tu_tm_push_state(tm_ctx, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state,
                 p, (size_t)MatrixKind::P);
     };
 
-    sum_task = [&](TU_GraphContext graph_ctx, void *, void *rawdata, tu_i64) {
+    sum_task = [&](TU_TaskManagerContext tm_ctx, void *, void *rawdata, tu_i64) {
         auto tiles = (std::pair<MatrixTile *, MatrixTile *>*)rawdata;
         auto [p, c] = *tiles;
         assert(p->rows == c->rows);
@@ -180,12 +180,12 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         // TODO: this is tmp, we will implement proper memory management helpers later
         delete tiles; // tiles was dynamically allocated in the sum state
         deallocate_tile(p);
-        tu_graph_push_state(graph_ctx, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state, c, (size_t)MatrixKind::C);
+        tu_tm_push_state(tm_ctx, sum_state_group, &sum_state_ctx, &run_lambda, &sum_state, c, (size_t)MatrixKind::C);
     };
 
     std::vector<MatrixTile*> A_tiles(TM * TK);
     std::vector<MatrixTile*> B_tiles(TK * TN);
-    product_state = [&](TU_GraphContext graph_ctx, void *, void *rawdata, tu_i64 type) {
+    product_state = [&](TU_TaskManagerContext tm_ctx, void *, void *rawdata, tu_i64 type) {
         auto tile = (MatrixTile*)rawdata;
         auto matrix_kind = (MatrixKind)type;
 
@@ -199,7 +199,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     MatrixTile *b = B_tiles[tile->col * TN + col];
                     MatrixTile *p = allocate_tile(a->rows, b->cols, a->row, b->col);
                     auto tiles = new std::tuple<MatrixTile *, MatrixTile *, MatrixTile *>(a, b, p);
-                    tu_graph_push_task(graph_ctx, product_task_group, &run_lambda, &product_task, tiles, -1);
+                    tu_tm_push_task(tm_ctx, product_task_group, &run_lambda, &product_task, tiles, -1);
                 }
             }
         } break;
@@ -212,7 +212,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                     MatrixTile *b = tile;
                     MatrixTile *p = allocate_tile(a->rows, b->cols, a->row, b->col);
                     auto tiles = new std::tuple<MatrixTile *, MatrixTile *, MatrixTile *>(a, b, p);
-                    tu_graph_push_task(graph_ctx, product_task_group, &run_lambda, &product_task, tiles, -1);
+                    tu_tm_push_task(tm_ctx, product_task_group, &run_lambda, &product_task, tiles, -1);
                 }
             }
         } break;
@@ -223,7 +223,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     std::vector<std::vector<MatrixTile*>> sum_queues(TM * TN);
     std::vector<MatrixTile*> C_tiles(TM * TN);
-    sum_state = [&](TU_GraphContext graph_ctx, void *, void *rawdata, tu_i64 type) {
+    sum_state = [&](TU_TaskManagerContext tm_ctx, void *, void *rawdata, tu_i64 type) {
         auto tile = (MatrixTile*)rawdata;
         auto matrix_kind = (MatrixKind)type;
 
@@ -237,7 +237,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                 auto p = sum_queues[c_idx].back();
                 sum_queues[c_idx].pop_back();
                 auto tiles = new std::pair<MatrixTile *, MatrixTile *>(p, tile);
-                tu_graph_push_task(graph_ctx, sum_task_group, &run_lambda, &sum_task, tiles, -1);
+                tu_tm_push_task(tm_ctx, sum_task_group, &run_lambda, &sum_task, tiles, -1);
             } else {
                 C_tiles[c_idx] = tile;
             }
@@ -248,7 +248,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
                 auto c = C_tiles[c_idx];
                 C_tiles[c_idx] = nullptr;
                 auto tiles = new std::pair<MatrixTile *, MatrixTile *>(tile, c);
-                tu_graph_push_task(graph_ctx, sum_task_group, &run_lambda, &sum_task, tiles, -1);
+                tu_tm_push_task(tm_ctx, sum_task_group, &run_lambda, &sum_task, tiles, -1);
             } else {
                 sum_queues[c_idx].push_back(tile);
             }
@@ -256,15 +256,15 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         }
     };
 
-    tu_graph_push_op(&graph, split_task_group, nullptr, &run_lambda, &split_task, &A, (tu_i64)MatrixKind::A);
-    tu_graph_push_op(&graph, split_task_group, nullptr, &run_lambda, &split_task, &B, (tu_i64)MatrixKind::B);
-    tu_graph_push_op(&graph, split_task_group, nullptr, &run_lambda, &split_task, &C, (tu_i64)MatrixKind::C);
+    tu_tm_push_op(&tm, split_task_group, nullptr, &run_lambda, &split_task, &A, (tu_i64)MatrixKind::A);
+    tu_tm_push_op(&tm, split_task_group, nullptr, &run_lambda, &split_task, &B, (tu_i64)MatrixKind::B);
+    tu_tm_push_op(&tm, split_task_group, nullptr, &run_lambda, &split_task, &C, (tu_i64)MatrixKind::C);
 
-    tu_graph_wait_completion(&graph);
-    tu_graph_fini(&graph);
-    tu_graph_print_profile_infos(&graph);
-    tu_graph_state_print_profile_infos(&product_state_cxt, "product_state");
-    tu_graph_state_print_profile_infos(&sum_state_ctx, "sum_state");
+    tu_tm_wait_completion(&tm);
+    tu_tm_fini(&tm);
+    tu_tm_print_profile_infos(&tm);
+    tu_tm_state_print_profile_infos(&product_state_cxt, "product_state");
+    tu_tm_state_print_profile_infos(&sum_state_ctx, "sum_state");
 }
 
 void initialize_matrix(Matrix &m) {
@@ -286,7 +286,7 @@ void test_hadamard() {
     initialize_matrix(A);
     initialize_matrix(B);
     zero_matrix(C);
-    graph_hadamard(A, B, C, 256);
+    tm_hadamard(A, B, C, 256);
 
     for (size_t i = 0; i < C.rows; ++i) {
         for (size_t j = 0; j < C.cols; ++j) {
@@ -326,9 +326,9 @@ void test_dgemm() {
 
     // printf("running matmul...\n");
     // matmul(A, B, E);
-    printf("running graph dgemm...\n");
+    printf("running tm dgemm...\n");
     timer_start(dgemm);
-    graph_dgemm(A, B, C, TILE_SIZE);
+    tm_dgemm(A, B, C, TILE_SIZE);
     timer_end(dgemm);
     timer_report(dgemm);
 
@@ -355,13 +355,13 @@ void test_dgemm() {
 //
 //     printf("running hh dgemm...\n");
 //     timer_start(dgemm_hh);
-//     DgemmGraph graph(M, N, K, TILE_SIZE);
-//     graph.executeGraph(true);
-//     graph.pushData(A);
-//     graph.pushData(B);
-//     graph.pushData(C);
-//     graph.finishPushingData();
-//     graph.waitForTermination();
+//     DgemmGraph tm(M, N, K, TILE_SIZE);
+//     tm.executeGraph(true);
+//     tm.pushData(A);
+//     tm.pushData(B);
+//     tm.pushData(C);
+//     tm.finishPushingData();
+//     tm.waitForTermination();
 //     timer_end(dgemm_hh);
 //     timer_report(dgemm_hh);
 //

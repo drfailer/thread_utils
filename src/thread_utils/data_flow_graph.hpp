@@ -18,7 +18,6 @@ struct TU_GraphOperation;
 struct TU_GraphContext;
 
 using TU_GraphExecProc = void (*)(TU_GraphContext, void *, void *, tu_i64);
-// TODO: create a new queue { overflow_queue: LockFreeQueue, queue: RingBufQueue }
 // using TU_GraphOperationQueue = TU_LockFreeQueue<TU_GraphOperation>;
 // using TU_GraphOperationQueue = TU_LockQueue<TU_GraphOperation>;
 using TU_GraphOperationQueue = TU_FiniteOverflowQueue<TU_GraphOperation, 1024>;
@@ -26,22 +25,6 @@ using TU_GraphOperationQueue = TU_FiniteOverflowQueue<TU_GraphOperation, 1024>;
 struct TU_GraphContext {
     TU_GraphWorker *worker;
     void *state;
-};
-
-struct TU_GraphNodeAndType {
-    tu_u64 node_id;
-    tu_u64 type_id;
-};
-
-struct TU_GraphNode {
-    tu_u64 id;
-    TU_Array<TU_Array<TU_GraphNodeAndType>> successors;
-    // TODO: we need to test adding a queue here
-    // Note: the queue here should not be an operation queue (since the exec function and context are bound to the task)
-};
-
-struct TU_GraphData {
-    TU_Array<TU_GraphNode> nodes;
 };
 
 struct TU_GraphOperation {
@@ -114,7 +97,7 @@ void tu_graph_start(TU_Graph *graph);
 
 void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecProc exec,
                         void *exec_ctx, void *data, tu_i64 index);
-void tu_graph_push_state(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphState *state,
                          TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index);
 void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
                       TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);

@@ -39,25 +39,20 @@ template <typename T, size_t SIZE>
 bool TU_FiniteLockFreeQueue<T, SIZE>::push(T value) {
     size_t w = this->write.load(std::memory_order_relaxed);
 
-    // try to increment the write cursor and write the value
-    for (;;) {
+    // try to reserve a slot without "drifting" the counter
+    do {
         size_t h = this->head.load(std::memory_order_acquire);
-
         if ((w - h) >= SIZE) {
-            return false;
+            return false; // the queue is full
         }
-        if (this->write.compare_exchange_weak(w, w + 1, std::memory_order_release)) {
-            this->buffer[w] = std::move(value);
-            break;
-        }
-    }
+    } while (!this->write.compare_exchange_weak(w, w + 1, std::memory_order_release));
 
-    // now we wait until we can move the tail so the consumers can pop
-    for (;;) {
-        size_t t = w; // we use an additional variable to avoid changing w
-        if (this->tail.compare_exchange_weak(t, w + 1, std::memory_order_release)) {
-            break;
-        }
+    // write the data
+    this->buffer[w] = std::move(value);
+
+    size_t expected = w;
+    while (!this->tail.compare_exchange_weak(expected, w + 1, std::memory_order_release)) {
+        expected = w; // reset expected to our reserved slot
         cross_platform_yield();
     }
     return true;
@@ -65,23 +60,17 @@ bool TU_FiniteLockFreeQueue<T, SIZE>::push(T value) {
 
 template <typename T, size_t SIZE>
 bool TU_FiniteLockFreeQueue<T, SIZE>::pop(T *result) {
-    assert(result != nullptr);
     size_t h = this->head.load(std::memory_order_relaxed);
 
-    // we try to increment the head
-    for (;;) {
+    do {
         size_t t = this->tail.load(std::memory_order_acquire);
         if (h >= t) {
-            // the queue is empty
-            return false;
+            return false; // Queue is empty
         }
-        if (this->head.compare_exchange_weak(h, h + 1, std::memory_order_release)) {
-            break;
-        }
-    }
+    } while (!this->head.compare_exchange_weak(h, h + 1, std::memory_order_release));
+
     *result = this->buffer[h];
     return true;
 }
-
 
 #endif

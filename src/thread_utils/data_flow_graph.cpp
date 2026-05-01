@@ -71,14 +71,14 @@ void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecPro
     tu_graph_push_op(graph_ctx.worker->group->graph, group, nullptr, exec, exec_ctx, data, index);
 }
 
-void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphState *state,
+void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphStateContext *state,
                          TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
     assert(graph_ctx.worker != nullptr);
     assert(graph_ctx.worker->group != nullptr);
     tu_graph_push_op(graph_ctx.worker->group->graph, group, state, exec, exec_ctx, data, index);
 }
 
-void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphStateContext *state,
                       TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index) {
     assert(graph != nullptr);
     assert(group < graph->groups.size());
@@ -114,7 +114,7 @@ void tu_graph_print_profile_infos(TU_Graph *graph) {
     }
 }
 
-void tu_graph_state_print_profile_infos(TU_GraphState *state, char const *state_name) {
+void tu_graph_state_print_profile_infos(TU_GraphStateContext *state, char const *state_name) {
     size_t push_count = state->prof_queue.push_count.load();
     std::string push_dur_ttl = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load()));
     std::string push_dur_avg = tu_duration_to_string(TU_Duration(state->prof_queue.push_dur.load() / push_count));
@@ -156,14 +156,14 @@ static void group_fini(TU_GraphThreadGroup *group) {
     }
 }
 
-static void state_push_op(TU_GraphState *state, TU_GraphOperation *op) {
+static void state_push_op(TU_GraphStateContext *state, TU_GraphOperation *op) {
     TU_Stopwatch sw;
     tu_prof_push_begin(&state->prof_queue, &sw);
     state->queue.push(*op);
     tu_prof_push_end(&state->prof_queue, &sw);
 }
 
-static bool state_pop_op(TU_GraphState *state, TU_GraphOperation *op) {
+static bool state_pop_op(TU_GraphStateContext *state, TU_GraphOperation *op) {
     TU_Stopwatch sw;
     tu_prof_pop_begin(&state->prof_queue, &sw);
     bool poped = state->queue.pop(op);

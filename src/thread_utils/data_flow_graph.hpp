@@ -13,7 +13,7 @@
 struct TU_Graph;
 struct TU_GraphThreadGroup;
 struct TU_GraphWorker;
-struct TU_GraphState;
+struct TU_GraphStateContext;
 struct TU_GraphOperation;
 struct TU_GraphContext;
 
@@ -32,10 +32,10 @@ struct TU_GraphOperation {
     void *exec_ctx = nullptr;
     void *data = nullptr;
     tu_i64 index = 0;
-    TU_GraphState *state;
+    TU_GraphStateContext *state;
 };
 
-struct TU_GraphState {
+struct TU_GraphStateContext {
     TU_Mutex dbg_mutex;
 
     alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
@@ -97,12 +97,12 @@ void tu_graph_start(TU_Graph *graph);
 
 void tu_graph_push_task(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphExecProc exec,
                         void *exec_ctx, void *data, tu_i64 index);
-void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphState *state,
+void tu_graph_push_state(TU_GraphContext graph_ctx, tu_u64 group, TU_GraphStateContext *state,
                          TU_GraphExecProc exec, void *exec_ctx, void *data, tu_i64 index);
-void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphState *state,
+void tu_graph_push_op(TU_Graph *graph, tu_u64 group, TU_GraphStateContext *state,
                       TU_GraphExecProc exec, void *ctx, void *data, tu_i64 index);
 
 void tu_graph_print_profile_infos(TU_Graph *graph);
-void tu_graph_state_print_profile_infos(TU_GraphState *state, char const *state_name);
+void tu_graph_state_print_profile_infos(TU_GraphStateContext *state, char const *state_name);
 
 #endif

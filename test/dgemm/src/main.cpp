@@ -103,7 +103,7 @@ void graph_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
     tu_graph_start(&graph);
 
-    TU_GraphState product_state_cxt, sum_state_ctx;
+    TU_GraphStateContext product_state_cxt, sum_state_ctx;
 
     assert(A.rows == C.rows);
     assert(B.cols == C.cols);

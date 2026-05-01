@@ -48,6 +48,7 @@ bool TU_FiniteLockFreeQueue<T, SIZE>::push(T value) {
         }
         if (this->write.compare_exchange_weak(w, w + 1, std::memory_order_release)) {
             this->buffer[w] = std::move(value);
+            break;
         }
     }
 

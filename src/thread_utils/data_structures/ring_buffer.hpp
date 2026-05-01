@@ -1,5 +1,6 @@
 #ifndef THREAD_UTILS_DATA_STRUCTURES_RING_BUFFER
 #define THREAD_UTILS_DATA_STRUCTURES_RING_BUFFER
+#include <cstring>
 
 template <typename T, size_t SIZE=1024>
 struct TU_RingBuffer {
@@ -7,6 +8,13 @@ struct TU_RingBuffer {
     static constexpr size_t MASK = SIZE - 1;
     T buffer[SIZE];
     T &operator[](size_t idx) { return buffer[idx & MASK]; }
+    TU_RingBuffer() = default;
+    TU_RingBuffer(TU_RingBuffer<T, SIZE> const &) = delete;
+    TU_RingBuffer(TU_RingBuffer<T, SIZE> &&other) {
+        for (size_t i = 0; i < SIZE; ++i) {
+            this->buffer[i] = std::move(other.buffer[i]);
+        }
+    }
 };
 
 #endif

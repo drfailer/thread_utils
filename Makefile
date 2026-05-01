@@ -22,6 +22,8 @@ build/lib/libthread_utils.a: $(OBJ)
 
 build/%.o: src/%.cpp
 	@mkdir -p build/thread_utils/tools
+	@mkdir -p build/thread_utils/task_manager
+	@mkdir -p build/thread_utils/dfg
 	$(CC) $(CXXFLAGS) -o $@ -c $<
 
 clean:

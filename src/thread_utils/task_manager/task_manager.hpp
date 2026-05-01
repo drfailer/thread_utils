@@ -1,11 +1,11 @@
 #ifndef SRC_THREAD_UTILS_TASK_MANAGER
 #define SRC_THREAD_UTILS_TASK_MANAGER
-#include "common.hpp"
-#include "data_structures/lock_free_queue.hpp"
-#include "data_structures/lock_queue.hpp"
-#include "data_structures/finite_overflow_queue.hpp"
-#include "data_structures/cache_queue.hpp"
-#include "tools/profiling.hpp"
+#include "../common.hpp"
+#include "../data_structures/lock_free_queue.hpp"
+#include "../data_structures/lock_queue.hpp"
+#include "../data_structures/finite_overflow_queue.hpp"
+#include "../data_structures/cache_queue.hpp"
+#include "../tools/profiling.hpp"
 
 // TODO:
 // - For cuda, we may want to either bind a group to a stream or even a worker

@@ -65,10 +65,24 @@ tu_u64 tu_tm_add_thread_group(TU_TaskManager *tm, size_t thread_count) {
 }
 
 void tu_tm_push_task(TU_TaskManagerContext tm_ctx, tu_u64 group, TU_TaskManagerExecProc exec,
-                        void *exec_ctx, void *data, tu_i64 index) {
+                     void *exec_ctx, void *data, tu_i64 index) {
     assert(tm_ctx.worker != nullptr);
     assert(tm_ctx.worker->group != nullptr);
-    tu_tm_push_op(tm_ctx.worker->group->tm, group, nullptr, exec, exec_ctx, data, index);
+    if (tm_ctx.worker->group->group_index != group) {
+        tu_tm_push_op(tm_ctx.worker->group->tm, group, nullptr, exec, exec_ctx, data, index);
+        return;
+    }
+    TU_TaskManagerOperation new_operation{
+        .exec = exec,
+        .exec_ctx = exec_ctx,
+        .data = data,
+        .index = index,
+        .state = nullptr,
+    };
+    TU_TaskManagerOperation op;
+    if (tm_ctx.worker->cache.cache(new_operation, &op)) {
+        tu_tm_push_op(tm_ctx.worker->group->tm, group, nullptr, op.exec, op.exec_ctx, op.data, op.index);
+    }
 }
 
 void tu_tm_push_state(TU_TaskManagerContext tm_ctx, tu_u64 group, TU_TaskManagerStateContext *state,
@@ -230,6 +244,14 @@ static bool worker_pop_op(TU_TaskManagerWorker *worker, TU_TaskManagerOperation 
     return poped;
 }
 
+static void worker_process_cache(TU_TaskManagerWorker *worker) {
+    size_t processed_operation_count = 0;
+    for (TU_TaskManagerOperation op; worker->cache.pop(&op);) {
+        op.exec(TU_TaskManagerContext{worker, op.state}, op.exec_ctx, op.data, op.index);
+        processed_operation_count += 1;
+    }
+}
+
 static void tu_tm_worker_process_operation_queue(TU_TaskManagerWorker *worker) {
     assert(worker != nullptr);
     assert(worker->group != nullptr);
@@ -237,7 +259,9 @@ static void tu_tm_worker_process_operation_queue(TU_TaskManagerWorker *worker) {
     size_t processed_operation_count = 0;
     for (TU_TaskManagerOperation op = {}; worker_pop_op(worker, &op);) {
         processed_operation_count += tu_tm_worker_process_operation(worker, &op);
+        worker_process_cache(worker);
     }
+    // update the counter
     worker->group->tm->operation_counter -= processed_operation_count;
     assert(worker->group->tm->operation_counter.load() >= 0);
 }

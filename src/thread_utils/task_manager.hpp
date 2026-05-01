@@ -4,6 +4,7 @@
 #include "data_structures/lock_free_queue.hpp"
 #include "data_structures/lock_queue.hpp"
 #include "data_structures/finite_overflow_queue.hpp"
+#include "data_structures/cache_queue.hpp"
 #include "tools/profiling.hpp"
 
 // TODO:
@@ -18,8 +19,8 @@ struct TU_TaskManagerOperation;
 struct TU_TaskManagerContext;
 
 using TU_TaskManagerExecProc = void (*)(TU_TaskManagerContext, void *, void *, tu_i64);
-// using TU_TaskManagerOperationQueue = TU_LockFreeQueue<TU_TaskManagerOperation>;
 // using TU_TaskManagerOperationQueue = TU_LockQueue<TU_TaskManagerOperation>;
+// using TU_TaskManagerOperationQueue = TU_LockFreeQueue<TU_TaskManagerOperation>;
 using TU_TaskManagerOperationQueue = TU_FiniteOverflowQueue<TU_TaskManagerOperation, 1024>;
 
 struct TU_TaskManagerContext {
@@ -40,7 +41,6 @@ struct TU_TaskManagerStateContext {
 
     alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
     TU_TaskManagerOperationQueue queue = {};
-    void *ctx;
     //profiling
     TU_ProfQueueInfos prof_queue;
 };
@@ -49,14 +49,16 @@ struct TU_TaskManagerWorker {
     TU_Thread thread;
     TU_TaskManagerThreadGroup *group = nullptr;
     tu_u64 worker_index = 0;
-    TU_AtomicFlag parked = true, can_terminate = false;
+    TU_CacheQueue<TU_TaskManagerOperation> cache{4};
+    alignas(CACHE_LINE) TU_AtomicFlag parked = true;
+    alignas(CACHE_LINE) TU_AtomicFlag can_terminate = false;
 
     // constructors
     TU_TaskManagerWorker() = default;
     TU_TaskManagerWorker(TU_TaskManagerWorker const &other) = delete;
     TU_TaskManagerWorker(TU_TaskManagerWorker &&other)
         : thread(std::move(other.thread)), group(other.group), worker_index(other.worker_index),
-          parked(other.parked.load()), can_terminate(other.can_terminate.load()) {}
+          cache(std::move(other.cache)), parked(other.parked.load()), can_terminate(other.can_terminate.load()) {}
 };
 
 struct TU_TaskManagerThreadGroup {
@@ -77,6 +79,7 @@ struct TU_TaskManagerThreadGroup {
 };
 
 struct TU_TaskManager {
+    // TODO: this should be per group
     alignas(CACHE_LINE) TU_Atomic<tu_i64> operation_counter = 0; // we use a i64 instead of a u64 to detect overflow while debugging
     TU_Mutex mutex;
     TU_Cond cond;

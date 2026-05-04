@@ -1,6 +1,6 @@
 #ifndef THREAD_UTILS_DFG
 #define THREAD_UTILS_DFG
-#include "common.hpp"
+#include "../common.hpp"
 
 struct TU_GraphNode;
 struct TU_GraphData;

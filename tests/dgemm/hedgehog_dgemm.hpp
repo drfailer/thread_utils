@@ -1,7 +1,8 @@
 #ifndef HEDGEHOG_DGEMM
 #define HEDGEHOG_DGEMM
 #include <hedgehog.h>
-#include "data.hpp"
+#include <stdio.h>
+#include "matrix.hpp"
 
 MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col);
 void deallocate_tile(MatrixTile *tile);
@@ -65,8 +66,10 @@ struct ProductTask : hh::AbstractTask<1, std::tuple<ATilePtr, BTilePtr, PTilePtr
         assert(a->rows == p->rows);
         assert(b->cols == p->cols);
         assert(a->cols == b->rows);
+        p->row = a->row;
+        p->col = b->col;
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint)a->rows, (blasint)b->cols, (blasint)a->cols,
-                    1.f, (const double *)a->data, (blasint)a->cols, (const double *)b->data, (blasint)b->cols, 0,
+                    1.f, (const double *)a->data, (blasint)a->matrixCols, (const double *)b->data, (blasint)b->matrixCols, 0,
                     (double *)p->data, (blasint)p->cols);
         this->addResult(p);
     }
@@ -138,7 +141,7 @@ struct ComputeTask : hh::AbstractTask<5, ComputeTaskI, ComputeTaskO> {// {{{
         assert(b->cols == p->cols);
         assert(a->cols == b->rows);
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint)a->rows, (blasint)b->cols, (blasint)a->cols,
-                    1.f, (const double *)a->data, (blasint)a->cols, (const double *)b->data, (blasint)b->cols, 0,
+                    1.f, (const double *)a->data, (blasint)a->matrixCols, (const double *)b->data, (blasint)b->matrixCols, 0,
                     (double *)p->data, (blasint)p->cols);
         this->addResult(p);
     }// }}}

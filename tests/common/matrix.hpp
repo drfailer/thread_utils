@@ -1,5 +1,7 @@
-#ifndef DATA
-#define DATA
+#ifndef TESTS_COMMON_MATRIX
+#define TESTS_COMMON_MATRIX
+#include <unistd.h>
+#include <cstring>
 
 enum class MatrixKind { A, B, C, P };
 
@@ -41,5 +43,13 @@ using MatrixTile = MatTile<>;
 struct TileTriplet {
     MatrixTile a, b, c;
 };
+
+// functions ///////////////////////////////////////////////////////////////////
+
+bool matrix_test_equal(Matrix const &found, Matrix const&expected, double tolerance = 1e-6);
+void matrix_init_double(Matrix &m);
+void matrix_init_int(Matrix &m);
+void matrix_zero(Matrix &m);
+void matrix_print(Matrix const &m);
 
 #endif

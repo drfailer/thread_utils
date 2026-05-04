@@ -1,55 +1,29 @@
 #include <cstdio>
-#include <cstring>
 #include <cassert>
 #include <tuple>
 #include <functional>
-#include <cblas.h>
-#include "thread_utils.hpp"
-#include "data.hpp"
+#include <blas.hpp>
+#include "thread_utils/thread_utils.hpp"
+#include "matrix.hpp"
 #include "timer.hpp"
+
+constexpr size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
+#define DGEMM_HH
+
+#ifdef DGEMM_HH
 #include "hedgehog_dgemm.hpp"
+#endif // DGEMM_HH
 
-void tm_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
-    std::vector<TileTriplet> tiles;
-    TU_TaskManager tm;
-
-    tu_tm_init(&tm);
-
-    tu_tm_add_thread_group(&tm, 10);
-
-    tu_tm_start(&tm);
-
-    for (size_t i = 0; i < C.rows; i += tile_size) {
-        for (size_t j = 0; j < C.cols; j += tile_size) {
-            MatrixTile tile{
-                .row = i / tile_size,
-                .col = j / tile_size,
-                .rows = std::min(C.rows - i, tile_size),
-                .cols = std::min(C.cols - j, tile_size),
-                .matrixRow = i,
-                .matrixCol = j,
-                .matrixRows = C.rows,
-                .matrixCols = C.cols,
-                .data = nullptr,
-            };
-            tiles.emplace_back(tile, tile, tile);
-            tiles.back().a.data = &A(i, j);
-            tiles.back().b.data = &B(i, j);
-            tiles.back().c.data = &C(i, j);
-            tu_tm_push_op(&tm, 0, nullptr, [](TU_TaskManagerContext, void *, void *rawdata, tu_i64) {
-                assert(rawdata != nullptr);
-                auto data = (TileTriplet*)rawdata;
-                for (size_t i = 0; i < data->c.rows; ++i) {
-                    for (size_t j = 0; j < data->c.cols; ++j) {
-                        data->c(i, j) = data->a(i, j) * data->b(i, j);
-                    }
-                }
-            }, nullptr, &tiles.back(), 0);
-        }
-    }
-
-    tu_tm_wait_completion(&tm);
-    tu_tm_fini(&tm);
+void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
+    assert(A.rows == C.rows);
+    assert(B.cols == C.cols);
+    assert(A.cols == B.rows);
+    timer_start(cblas_dgemm);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint)A.rows, (blasint)B.cols, (blasint)A.cols,
+                1.f, (const double *)A.data, (blasint)A.cols, (const double *)B.data, (blasint)B.cols, .0f,
+                (double *)C.data, (blasint)C.cols);
+    timer_end(cblas_dgemm);
+    timer_report(cblas_dgemm);
 }
 
 MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
@@ -156,8 +130,10 @@ void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         assert(b->cols == p->cols);
         assert(a->cols == b->rows);
 
+        p->row = a->row;
+        p->col = b->col;
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint)a->rows, (blasint)b->cols, (blasint)a->cols,
-                    1.f, (const double *)a->data, (blasint)a->cols, (const double *)b->data, (blasint)b->cols, 0,
+                    1.f, (const double *)a->data, (blasint)a->matrixCols, (const double *)b->data, (blasint)b->matrixCols, 0,
                     (double *)p->data, (blasint)p->cols);
 
         // TODO: this is tmp, we will implement proper memory management helpers later
@@ -267,111 +243,68 @@ void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     tu_tm_state_print_profile_infos(&sum_state_ctx, "sum_state");
 }
 
-void initialize_matrix(Matrix &m) {
-    for (size_t i = 0; i < m.rows; ++i) {
-        for (size_t j = 0; j < m.cols; ++j) {
-            m(i, j) = 1. / double(i * m.cols + j + 1);
-            // m(i, j) = i * m.cols + j;
-        }
-    }
-}
-
-void zero_matrix(Matrix &m) {
-    memset(m.data, 0, m.rows * m.cols * sizeof(*m.data));
-}
-
-void test_hadamard() {
-    size_t M = 1024, N = 1024, K = 1024;
-    Matrix A(M, K), B(K, N), C(M, N);
-    initialize_matrix(A);
-    initialize_matrix(B);
-    zero_matrix(C);
-    tm_hadamard(A, B, C, 256);
-
-    for (size_t i = 0; i < C.rows; ++i) {
-        for (size_t j = 0; j < C.cols; ++j) {
-            double expected = A(i, j) * B(i, j);
-            if (C(i, j) != expected) {
-                printf("hadamard failed at (%ld, %ld), expected `%lf` found `%lf`.\n",
-                       i, j, expected, C(i, j));
-                return;
-            }
-        }
-    }
-    printf("hadamard success.\n");
-}
-
-void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
-    assert(A.rows == C.rows);
-    assert(B.cols == C.cols);
-    assert(A.cols == B.rows);
-
-    for (size_t row = 0; row < C.rows; ++row) {
-        for (size_t col = 0; col < C.cols; ++col) {
-            C(row, col) = 0;
-            for (size_t k = 0; k < A.cols; ++k) {
-                C(row, col) += A(row, k) * B(k, col);
-            }
-        }
-    }
-}
-
-void test_dgemm() {
-    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
-    Matrix A(M, K), B(K, N), C(M, N), E(M, N);
-    initialize_matrix(A);
-    initialize_matrix(B);
-    zero_matrix(C);
-    zero_matrix(E);
-
-    // printf("running matmul...\n");
-    // matmul(A, B, E);
-    printf("running tm dgemm...\n");
+void test_dgemm_tm(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
+    printf("\nrunning tm dgemm...\n");
     timer_start(dgemm);
     tm_dgemm(A, B, C, TILE_SIZE);
     timer_end(dgemm);
     timer_report(dgemm);
 
-    for (size_t row = 0; row < M; ++row) {
-        for (size_t col = 0; col < N; ++col) {
-            if (C(row, col) != E(row, col)) {
-                printf("dgemm failed at (%ld, %ld), expected `%lf` found `%lf`.\n",
-                       row, col, E(row, col), C(row, col));
-                return;
-            }
-        }
+    matrix_print(C);
+
+    if (!matrix_test_equal(C, E)) {
+        printf("dgemm_tm(%ld, %ld, %ld, %ld) failed.\n", M, N, K, TILE_SIZE);
+        return;
     }
-    printf("dgemm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
+    printf("dgemm_tm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
-void test_dgemm_hh() {
-    size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
-    auto A = std::make_shared<AMat>(M, K);
-    auto B = std::make_shared<BMat>(K, N);
-    auto C = std::make_shared<CMat>(M, N);
-    initialize_matrix(*reinterpret_cast<Matrix*>(A.get()));
-    initialize_matrix(*reinterpret_cast<Matrix*>(B.get()));
-    zero_matrix(*reinterpret_cast<Matrix*>(C.get()));
-
-    printf("running hh dgemm...\n");
+#ifdef DGEMM_HH
+void test_dgemm_hh(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
+    auto Aptr = std::shared_ptr<AMat>(reinterpret_cast<AMat *>(&A), [](AMat *){ /* do not delete */ });
+    auto Bptr = std::shared_ptr<BMat>(reinterpret_cast<BMat *>(&B), [](BMat *){ /* do not delete */ });
+    auto Cptr = std::shared_ptr<CMat>(reinterpret_cast<CMat *>(&C), [](CMat *){ /* do not delete */ });
+    printf("\nrunning hh dgemm...\n");
     timer_start(dgemm_hh);
     DgemmGraph tm(M, N, K, TILE_SIZE);
     tm.executeGraph(true);
-    tm.pushData(A);
-    tm.pushData(B);
-    tm.pushData(C);
+    tm.pushData(Aptr);
+    tm.pushData(Bptr);
+    tm.pushData(Cptr);
     tm.finishPushingData();
     tm.waitForTermination();
     timer_end(dgemm_hh);
     timer_report(dgemm_hh);
-
+    matrix_print(C);
+    if (!matrix_test_equal(C, E)) {
+        printf("dgemm_hh(%ld, %ld, %ld, %ld) failed.\n", M, N, K, TILE_SIZE);
+        return;
+    }
     printf("dgemm_hh(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
+#endif // DGEMM_HH
 
 int main(int, char **) {
+    // initialization (we do that before changing openblas thread count so we
+    // can compute the ground truth efficiently)
+    Matrix A(M, K);
+    Matrix B(K, N);
+    Matrix C(M, N);
+    Matrix E(M, N); // Expected
+    matrix_init_double(A);
+    matrix_init_double(B);
+
+    printf("compute ground truth...\n");
+    matmul(A, B, E);
+    matrix_print(E);
+
     openblas_set_num_threads(1);
-    // test_hadamard();
-    // test_dgemm_hh();
-    test_dgemm();
+
+    matrix_zero(C);
+    test_dgemm_tm(A, B, C, E);
+#ifdef DGEMM_HH
+    matrix_zero(C);
+    test_dgemm_hh(A, B, C, E);
+#endif // DGEMM_HH
     return 0;
 }

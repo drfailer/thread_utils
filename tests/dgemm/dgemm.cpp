@@ -308,7 +308,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     assert(false && "create groups + make sure there is a safety and an error message in the lib for this.");
 
-    assert(tu_graph_build(&graph));
+    assert(tu_graph_check(&graph));
 
     tu_graph_destroy(&graph);
 }

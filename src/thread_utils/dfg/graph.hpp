@@ -34,7 +34,6 @@ struct TU_Graph {
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> inputs = {};
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> outputs = {};
     const char *name = "Graph";
-    bool built = false;
     TU_Graph(const char *name) : name(name) {}
 };
 
@@ -51,7 +50,6 @@ struct TU_GraphNode {
     tu_u64 group = 0;
     TU_Map<TU_TypeId, TU_NodeExec> execs = {};
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> successors = {};
-    bool connected = false; // flag used to make sure we don't add more types to a connection node
 };
 
 TU_Graph tu_graph(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types);
@@ -60,7 +58,7 @@ TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Array<TU
 TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types, tu_u64 dfg_group);
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph);
 
-bool tu_graph_build(TU_Graph *graph);
+bool tu_graph_check(TU_Graph *graph);
 void tu_graph_destroy(TU_Graph *graph);
 
 // add exec function for a type to a node

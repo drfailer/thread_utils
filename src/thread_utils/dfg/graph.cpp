@@ -211,14 +211,10 @@ bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
             assert(tu_edge(sender, input_node, type));
         }
     } else {
-        if (!sender->execs.contains(type) || !receiver->execs.contains(type)) {
+        if (!sender->successors.contains(type) || !receiver->execs.contains(type)) {
             printf("[TU_ERROR]: cannot draw edge `%s' -> `%s' for type `%ld'.\n",
                    sender->name, receiver->name, type);
             return false;
-        }
-        // FIXME: this is wrong
-        if (!sender->successors.contains(type)) {
-            sender->successors[type] = {};
         }
         sender->successors[type].push_back(receiver);
     }

@@ -34,7 +34,6 @@ struct TU_Graph {
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> inputs = {};
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> outputs = {};
     TU_GraphNodeQueue results_queue = {};
-    TU_Cond *results_cond; // used to notify results
     const char *name = "Graph";
     TU_Graph(const char *name) : name(name) {}
 };
@@ -82,9 +81,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type);
 
 void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
 
-void tu_internal_node_enqueue(TU_GraphNode *node, TU_GraphData *data);
+void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_GraphData *data);
 bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data);
-
-void tu_internal_graph_connect_sink(TU_Graph *graph, TU_Cond *cond);
 
 #endif

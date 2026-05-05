@@ -33,9 +33,15 @@ struct TU_GraphOperation {
 
 using TU_GraphNodeQueue = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
 
-struct TU_ExecContext {
+struct TU_DfgContext {
+    TU_Dfg *dfg;
+    TU_DfgWorkerGroup *group;
     TU_DfgWorker *worker;
+};
+
+struct TU_ExecContext {
     TU_GraphNode *node;
+    TU_DfgContext dfg_ctx;
 };
 
 // args:

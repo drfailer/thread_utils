@@ -1,4 +1,5 @@
 #include "graph.hpp"
+#include "dfg.hpp"
 #include "log.hpp"
 
 // TODO(LOGGER): printf should be replaced with a configurable logger.
@@ -88,7 +89,7 @@ bool tu_graph_check(TU_Graph *graph) {
                 }
             }
             for (auto [type, successors] : node->successors) {
-                if (successors.empty()) {
+                if (successors.empty() && node->sink_graph == nullptr) {
                     printf("[TU_WARN]: node `%s' doesn't have successor for type `%ld'.\n",
                            node->name, type);
                 }
@@ -221,15 +222,15 @@ bool tu_add_inputs(TU_Graph *graph, TU_GraphNode *node) {
     if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         return tu_add_inputs_graph(graph, node->sub_type.graph);
     }
-    size_t input_count;
+    bool input_added = false;
     for (auto elt : node->execs) {
         TU_TypeId type = elt.first;
         if (graph->inputs.contains(type)) {
             graph->inputs[type].push_back(node);
-            input_count += 1;
+            input_added = true;
         }
     }
-    if (input_count == 0) {
+    if (!input_added) {
         printf("[TU_WARN]: cannot add node `%s' as inputs of graph `%s', no common input type found.\n",
                node->name, graph->name);
     }
@@ -263,15 +264,15 @@ bool tu_add_outputs(TU_Graph *graph, TU_GraphNode *node) {
     if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         return tu_add_outputs_graph(graph, node->sub_type.graph);
     }
-    bool is_output = false;
+    bool output_added = false;
     for (auto elt : node->successors) {
         TU_TypeId type = elt.first;
         if (graph->outputs.contains(type)) {
             graph->outputs[type].push_back(node);
-            is_output = true;
+            output_added = true;
         }
     }
-    if (is_output) {
+    if (!output_added) {
         printf("[TU_WARN]: cannot add node `%s' as outputs of graph `%s', no common output type found.\n",
                node->name, graph->name);
     } else {
@@ -347,7 +348,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
 
     if (node->sink_graph != nullptr && node->sink_graph->outputs.contains(type)) {
         node->sink_graph->results_queue.push(data);
-        node->sink_graph->results_cond->notify_all();
+        exec_ctx->dfg_ctx.dfg->cond.notify_all();
         result_sinked = true;
     }
 
@@ -360,25 +361,29 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     }
     // TODO(CACHE): try to use the worker cache
     for (TU_GraphNode *successor : node->successors[type]) {
-        tu_internal_node_enqueue(successor, &data);
+        tu_internal_node_enqueue(&exec_ctx->dfg_ctx, successor, &data);
     }
 }
 
-void tu_internal_node_enqueue(TU_GraphNode *node, TU_GraphData *data) {
+void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return;
     if (!ptr_arg_check(data)) return;
     switch (node->kind) {
     case TU_GRAPH_NODE_KIND_TASK: {
         assert(node->sub_type.task->queues.contains(data->type));
         node->sub_type.task->queues[data->type].push(*data);
+        dfg_ctx->group->sem.release();
     } break;
     case TU_GRAPH_NODE_KIND_STATE: {
         node->sub_type.state->queue.push(*data);
+        assert(dfg_ctx->group != nullptr);
+        assert(dfg_ctx->group->id == node->group);
+        dfg_ctx->group->sem.release();
     } break;
     case TU_GRAPH_NODE_KIND_GRAPH: {
         assert(node->sub_type.graph->inputs.contains(data->type));
         for (TU_GraphNode * input_node : node->sub_type.graph->inputs[data->type]) {
-            tu_internal_node_enqueue(input_node, data);
+            tu_internal_node_enqueue(dfg_ctx, input_node, data);
         }
     } break;
     }
@@ -399,10 +404,6 @@ bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
     case TU_GRAPH_NODE_KIND_GRAPH: assert(false && "cannot dequeue a graph"); break;
     }
     return false;
-}
-
-void tu_internal_graph_connect_sink(TU_Graph *graph, TU_Cond *cond) {
-    graph->results_cond = cond;
 }
 
 // this is set appart because it might be moved elsewhere

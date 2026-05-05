@@ -23,12 +23,19 @@ struct TU_GraphData {
     TU_TypeId type;
 };
 
+// Operation information that allow the workers to cache future operation
+// (avoid hitting a shared queue all the time, and preserve last processed
+// data).
+struct TU_GraphOperation {
+    TU_GraphData data;
+    TU_GraphNode *node;
+};
+
 using TU_GraphNodeQueue = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
 
 struct TU_ExecContext {
     TU_DfgWorker *worker;
     TU_GraphNode *node;
-    void *data; // task or state associated data
 };
 
 // args:

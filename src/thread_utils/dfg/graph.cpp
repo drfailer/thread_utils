@@ -284,32 +284,42 @@ bool tu_add_outputs(TU_Graph *graph, TU_GraphNode *node) {
 bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
     if (!ptr_arg_check(sender)) return false;
     if (!ptr_arg_check(receiver)) return false;
+
+    // when the sender is a graph, we need to connect all its outputs to the receiver
     if (sender->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         for (TU_GraphNode *output_node : sender->sub_type.graph->outputs[type]) {
             if (!tu_edge(output_node, receiver, type)) {
                 return false;
             }
         }
-    } else if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+        return true;
+    }
+
+    // when the receiver is a graph, we need to connect all its inputs to the sender
+    if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         for (TU_GraphNode *input_node : receiver->sub_type.graph->inputs[type]) {
             if (!tu_edge(sender, input_node, type)) {
                 return false;
             }
         }
-    } else {
-        if (!sender->successors.contains(type) || !receiver->execs.contains(type)) {
-            printf("[TU_ERROR]: cannot draw edge `%s' -> `%s' for type `%ld'.\n",
-                   sender->name, receiver->name, type);
-            return false;
-        }
-        sender->successors[type].push_back(receiver);
+        return true;
     }
+
+    // for standard nodes, we just need to add a successor when the types match
+    if (!sender->successors.contains(type) || !receiver->execs.contains(type)) {
+        printf("[TU_ERROR]: cannot draw edge `%s' -> `%s' for type `%ld'.\n",
+               sender->name, receiver->name, type);
+        return false;
+    }
+    sender->successors[type].push_back(receiver);
     return true;
 }
 
 bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     if (!ptr_arg_check(sender)) return false;
     if (!ptr_arg_check(receiver)) return false;
+
+    // when the sender is a graph, we need to connect all its outputs to the receiver
     if (sender->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         for (auto outputs : sender->sub_type.graph->outputs) {
             for (auto &output_node : outputs.second) {
@@ -318,7 +328,11 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
                 }
             }
         }
-    } else if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+        return true;
+    }
+
+    // when the receiver is a graph, we need to connect all its inputs to the sender
+    if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         for (auto &inputs : receiver->sub_type.graph->inputs) {
             for (auto input_node : inputs.second) {
                 if (!tu_edges(sender, input_node)) {
@@ -326,26 +340,32 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
                 }
             }
         }
-    } else {
-        for (auto exec : receiver->execs) {
-            TU_TypeId type = exec.first;
-            if (sender->successors.contains(type)) {
-                sender->successors[type].push_back(receiver);
-            }
+        return true;
+    }
+
+    // for standard nodes, we connect all the common types
+    for (auto exec : receiver->execs) {
+        TU_TypeId type = exec.first;
+        if (sender->successors.contains(type)) {
+            sender->successors[type].push_back(receiver);
         }
     }
     return true;
 }
 
+// FIXME: this function should be defined elsewhere
 // TODO(CACHE): bool tu_internal_worker_cache(worker, &graph_data);
 void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     if (!ptr_arg_check(exec_ctx)) return;
     if (!ptr_arg_check(ptr)) return;
+
     TU_GraphNode *node = exec_ctx->node;
-    // TU_DfgWorker *worker = exec_ctx->worker;
     TU_GraphData data{ptr, type};
     bool result_sinked = false;
 
+    // when we need to add a global result, we add the data to the graph result
+    // queue and we use the `result_sinked` flag to avoid generating a warning
+    // when there are no extra receivers
     if (node->sink_graph != nullptr && node->sink_graph->outputs.contains(type)) {
         node->sink_graph->results_queue.push(data);
         exec_ctx->dfg_ctx.dfg->cond.notify_all();
@@ -365,6 +385,16 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     }
 }
 
+// FIXME: this function should be defined elsewhere
+static void tu_internal_node_notify_workers(TU_DfgContext *dfg_ctx, TU_GraphNode *node) {
+    if (node->kind != TU_GRAPH_NODE_KIND_GRAPH) {
+        assert(dfg_ctx->dfg != nullptr);
+        dfg_ctx->dfg->groups[node->group].sem.release();
+    }
+}
+
+// FIXME: this function should be defined elsewhere
+// This function needs the dfg context because it also notifies the workers.
 void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return;
     if (!ptr_arg_check(data)) return;
@@ -372,23 +402,21 @@ void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_Gra
     case TU_GRAPH_NODE_KIND_TASK: {
         assert(node->sub_type.task->queues.contains(data->type));
         node->sub_type.task->queues[data->type].push(*data);
-        dfg_ctx->group->sem.release();
     } break;
     case TU_GRAPH_NODE_KIND_STATE: {
         node->sub_type.state->queue.push(*data);
-        assert(dfg_ctx->group != nullptr);
-        assert(dfg_ctx->group->id == node->group);
-        dfg_ctx->group->sem.release();
     } break;
     case TU_GRAPH_NODE_KIND_GRAPH: {
         assert(node->sub_type.graph->inputs.contains(data->type));
-        for (TU_GraphNode * input_node : node->sub_type.graph->inputs[data->type]) {
+        for (auto input_node : node->sub_type.graph->inputs[data->type]) {
             tu_internal_node_enqueue(dfg_ctx, input_node, data);
         }
     } break;
     }
+    tu_internal_node_notify_workers(dfg_ctx, node);
 }
 
+// FIXME: this function should be defined elsewhere
 bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return false;
     if (!ptr_arg_check(data)) return false;

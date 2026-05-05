@@ -323,9 +323,38 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     return true;
 }
 
+// TODO(CACHE): bool tu_internal_worker_cache(worker, &graph_data);
 void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type) {
-    // TODO
-    // with the output, we can check if the type is valid
+    if (!ptr_arg_check(exec_ctx)) return;
+    if (!ptr_arg_check(data)) return;
+    TU_GraphNode *node = exec_ctx->node;
+    // TU_DfgWorker *worker = exec_ctx->worker;
+    if (!node->successors.contains(type)) {
+        printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
+               type, node->name);
+        return;
+    }
+    // TODO(CACHE): try to use the worker cache
+    for (TU_GraphNode *successor : node->successors[type]) {
+        tu_internal_node_enqueue(successor, data, type);
+    }
+}
+
+void tu_internal_node_enqueue(TU_GraphNode *node, void *data, TU_TypeId type) {
+    if (!ptr_arg_check(node)) return;
+    switch (node->kind) {
+    case TU_GRAPH_NODE_KIND_TASK: {
+        node->sub_type.task->queues[type].push(TU_GraphData{data, type});
+    } break;
+    case TU_GRAPH_NODE_KIND_STATE: {
+        node->sub_type.state->queue.push(TU_GraphData{data, type});
+    } break;
+    case TU_GRAPH_NODE_KIND_GRAPH: {
+        for (TU_GraphNode * input_node : node->sub_type.graph->inputs[type]) {
+            tu_internal_node_enqueue(input_node, data, type);
+        }
+    } break;
+    }
 }
 
 // this is set appart because it might be moved elsewhere

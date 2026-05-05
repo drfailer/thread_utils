@@ -37,7 +37,7 @@ static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const cha
 }
 
 // TODO(C_INTERFACE): when we create the pure C interface, we will allocate the graph (the struct will be hidden)
-TU_Graph tu_graph(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types) {
+TU_Graph tu_graph_create(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types) {
     TU_Graph graph(name);
     for (TU_TypeId input_type : input_types) {
         graph.inputs[input_type] = {};

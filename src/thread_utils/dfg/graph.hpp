@@ -52,14 +52,14 @@ struct TU_GraphNode {
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> successors = {};
 };
 
-TU_Graph tu_graph(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types);
+TU_Graph tu_graph_create(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types);
+void tu_graph_destroy(TU_Graph *graph);
+
+bool tu_graph_check(TU_Graph *graph);
 
 TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types, tu_u64 dfg_group);
 TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types, tu_u64 dfg_group);
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph);
-
-bool tu_graph_check(TU_Graph *graph);
-void tu_graph_destroy(TU_Graph *graph);
 
 // add exec function for a type to a node
 bool tu_exec(TU_GraphNode *node, TU_TypeId type, TU_NodeExec exec);

@@ -8,7 +8,8 @@ add_compile_options("-O3")
 
 # Library sources (exclude main.cpp)
 set(LIB_SRCS
-    # src/thread_utils/dfg/dfg.cpp
+    src/thread_utils/dfg/dfg.cpp
+    src/thread_utils/dfg/graph.cpp
     src/thread_utils/tools/thread_pool.cpp
     src/thread_utils/tools/async_worker.cpp
     src/thread_utils/tools/profiling.cpp

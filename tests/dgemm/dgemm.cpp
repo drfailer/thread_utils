@@ -8,7 +8,7 @@
 #include "timer.hpp"
 
 constexpr size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
-#define DGEMM_HH
+// #define DGEMM_HH
 
 #ifdef DGEMM_HH
 #include "hedgehog_dgemm.hpp"
@@ -259,6 +259,60 @@ void test_dgemm_tm(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     printf("dgemm_tm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
+enum Types : tu_i64 {
+    T_MatrixA,
+    T_MatrixB,
+    T_MatrixC,
+    T_TileA,
+    T_TileB,
+    T_TileC,
+    T_TileP,
+    T_ABPTiles,
+    T_PCTiles,
+};
+
+void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
+    TU_Graph graph = tu_graph("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
+    TU_Dfg dfg(&graph);
+
+    auto split_task    = tu_task(&graph, "split_task", nullptr, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, 0);
+    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, 0);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_TileC}, 0);
+    auto product_state = tu_state(&graph, "product_state", nullptr, {T_TileA, T_TileB}, {T_ABPTiles}, 0);
+    auto sum_state     = tu_state(&graph, "sum_state", nullptr, {T_TileC, T_TileP}, {T_PCTiles, T_TileC}, 0);
+
+    tu_exec(split_task, T_MatrixA, nullptr); // TODO
+    tu_exec(split_task, T_MatrixB, nullptr); // TODO
+    tu_exec(split_task, T_MatrixC, nullptr); // TODO
+
+    tu_exec(product_task, T_ABPTiles, nullptr); // TODO
+
+    tu_exec(sum_task, T_PCTiles, nullptr); // TODO
+
+    tu_exec(product_state, T_TileA, nullptr); // TODO
+    tu_exec(product_state, T_TileB, nullptr); // TODO
+
+    tu_exec(sum_state, T_TileC, nullptr); // TODO
+    tu_exec(sum_state, T_TileP, nullptr); // TODO
+
+    assert(tu_add_inputs(&graph, split_task));
+    assert(tu_edges(split_task, product_state));
+    assert(tu_edges(split_task, sum_state));
+    assert(tu_edges(product_state, product_task));
+    assert(tu_edges(product_task, sum_state));
+    assert(tu_edges(sum_state, sum_task));
+    assert(tu_edges(sum_task, sum_state));
+    assert(tu_add_outputs(&graph, sum_state));
+
+    tu_graph_print_to_dot(&graph, "graph.dot");
+
+    assert(false && "create groups + make sure there is a safety and an error message in the lib for this.");
+
+    assert(tu_graph_build(&graph));
+
+    tu_graph_destroy(&graph);
+}
+
 #ifdef DGEMM_HH
 void test_dgemm_hh(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     auto Aptr = std::shared_ptr<AMat>(reinterpret_cast<AMat *>(&A), [](AMat *){ /* do not delete */ });
@@ -291,20 +345,22 @@ int main(int, char **) {
     Matrix B(K, N);
     Matrix C(M, N);
     Matrix E(M, N); // Expected
-    matrix_init_double(A);
-    matrix_init_double(B);
+    // matrix_init_double(A);
+    // matrix_init_double(B);
 
-    printf("compute ground truth...\n");
-    matmul(A, B, E);
-    matrix_print(E);
+    // printf("compute ground truth...\n");
+    // matmul(A, B, E);
+    // matrix_print(E);
 
-    openblas_set_num_threads(1);
+    // openblas_set_num_threads(1);
 
+    // matrix_zero(C);
+    // test_dgemm_tm(A, B, C, E);
     matrix_zero(C);
-    test_dgemm_tm(A, B, C, E);
-#ifdef DGEMM_HH
-    matrix_zero(C);
-    test_dgemm_hh(A, B, C, E);
-#endif // DGEMM_HH
+    test_dgemm_dfg(A, B, C, E);
+// #ifdef DGEMM_HH
+//     matrix_zero(C);
+//     test_dgemm_hh(A, B, C, E);
+// #endif // DGEMM_HH
     return 0;
 }

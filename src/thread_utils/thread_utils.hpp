@@ -4,5 +4,7 @@
 #include "tools/async_worker.hpp"
 #include "tools/thread_pool.hpp"
 #include "task_manager/task_manager.hpp"
+#include "dfg/dfg.hpp"
+#include "dfg/graph.hpp"
 
 #endif

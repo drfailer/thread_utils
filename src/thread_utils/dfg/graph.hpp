@@ -79,6 +79,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type);
 
 void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
 
-void tu_internal_node_enqueue(TU_GraphNode *node, void *data, TU_TypeId type);
+void tu_internal_node_enqueue(TU_GraphNode *node, TU_GraphData *data);
+bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data);
 
 #endif

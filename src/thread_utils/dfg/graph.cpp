@@ -335,26 +335,47 @@ void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type) {
         return;
     }
     // TODO(CACHE): try to use the worker cache
+    TU_GraphData gdata{data, type};
     for (TU_GraphNode *successor : node->successors[type]) {
-        tu_internal_node_enqueue(successor, data, type);
+        tu_internal_node_enqueue(successor, &gdata);
     }
 }
 
-void tu_internal_node_enqueue(TU_GraphNode *node, void *data, TU_TypeId type) {
+void tu_internal_node_enqueue(TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return;
+    if (!ptr_arg_check(data)) return;
     switch (node->kind) {
     case TU_GRAPH_NODE_KIND_TASK: {
-        node->sub_type.task->queues[type].push(TU_GraphData{data, type});
+        assert(node->sub_type.task->queues.contains(data->type));
+        node->sub_type.task->queues[data->type].push(*data);
     } break;
     case TU_GRAPH_NODE_KIND_STATE: {
-        node->sub_type.state->queue.push(TU_GraphData{data, type});
+        node->sub_type.state->queue.push(*data);
     } break;
     case TU_GRAPH_NODE_KIND_GRAPH: {
-        for (TU_GraphNode * input_node : node->sub_type.graph->inputs[type]) {
-            tu_internal_node_enqueue(input_node, data, type);
+        assert(node->sub_type.graph->inputs.contains(data->type));
+        for (TU_GraphNode * input_node : node->sub_type.graph->inputs[data->type]) {
+            tu_internal_node_enqueue(input_node, data);
         }
     } break;
     }
+}
+
+bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
+    if (!ptr_arg_check(node)) return false;
+    if (!ptr_arg_check(data)) return false;
+    switch (node->kind) {
+    case TU_GRAPH_NODE_KIND_TASK: {
+        for (auto &[type, queue] : node->sub_type.task->queues) {
+            if (queue.pop(data)) {
+                return true;
+            }
+        }
+    } break;
+    case TU_GRAPH_NODE_KIND_STATE: return node->sub_type.state->queue.pop(data); break;
+    case TU_GRAPH_NODE_KIND_GRAPH: assert(false && "cannot dequeue a graph"); break;
+    }
+    return false;
 }
 
 // this is set appart because it might be moved elsewhere

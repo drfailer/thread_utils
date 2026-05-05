@@ -369,7 +369,7 @@ static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t l
     if (level == 0) {
         fs << "digraph " << ADDR(graph) << "{" << std::endl;
         // source
-        fs << "source [shape=invhouse];" << std::endl;
+        fs << "source [label="",width=.1,shape=circle];" << std::endl;
         for (auto [type, inputs] : graph->inputs) {
             std::string edge = "source" + std::to_string(type);
             fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
@@ -379,7 +379,7 @@ static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t l
             }
         }
         // sink
-        fs << "sink [shape=dot];" << std::endl;
+        fs << "sink [width=.1,shape=point];" << std::endl;
         for (auto [type, outputs] : graph->outputs) {
             for (auto node : outputs) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";

@@ -33,6 +33,8 @@ struct TU_Graph {
     // TODO we will need to use sets here to avoid adding inputs/outputs multiple times
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> inputs = {};
     TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> outputs = {};
+    TU_GraphNodeQueue results_queue = {};
+    TU_Cond *results_cond; // used to notify results
     const char *name = "Graph";
     TU_Graph(const char *name) : name(name) {}
 };
@@ -46,6 +48,7 @@ struct TU_GraphNode {
     } sub_type;
     const char *name;
     TU_Graph *graph = nullptr;
+    TU_Graph *sink_graph = nullptr;
     void *data = nullptr;
     tu_u64 group = 0;
     TU_Map<TU_TypeId, TU_NodeExec> execs = {};
@@ -81,5 +84,7 @@ void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
 
 void tu_internal_node_enqueue(TU_GraphNode *node, TU_GraphData *data);
 bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data);
+
+void tu_internal_graph_connect_sink(TU_Graph *graph, TU_Cond *cond);
 
 #endif

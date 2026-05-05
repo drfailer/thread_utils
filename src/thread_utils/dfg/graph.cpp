@@ -21,6 +21,7 @@ static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const cha
     }
     node->name = name;
     node->graph = graph;
+    node->sink_graph = nullptr;
     node->data = data;
     node->group = dfg_group;
     graph->nodes.push_back(node);
@@ -61,6 +62,15 @@ TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Array<T
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph) {
     TU_GraphNode *node = make_node(graph, TU_GRAPH_NODE_KIND_GRAPH, graph->name, nullptr, {}, {}, 0);
     node->sub_type.graph = sub_graph;
+    // we need to reset the sink_graph pointer to avoid tasks to output to the
+    // result queue for nothing
+    for (auto &[type, outputs] : sub_graph->outputs) {
+        for (auto output_node : outputs) {
+            if (output_node->sink_graph != graph) {
+                output_node->sink_graph = nullptr;
+            }
+        }
+    }
     return node;
 }
 
@@ -243,6 +253,7 @@ bool tu_add_output(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
         return true; // it is a warning so we don't fail
     }
     graph->outputs[type].push_back(node);
+    node->sink_graph = graph;
     return true;
 }
 
@@ -252,17 +263,19 @@ bool tu_add_outputs(TU_Graph *graph, TU_GraphNode *node) {
     if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         return tu_add_outputs_graph(graph, node->sub_type.graph);
     }
-    size_t output_count = 0;
+    bool is_output = false;
     for (auto elt : node->successors) {
         TU_TypeId type = elt.first;
         if (graph->outputs.contains(type)) {
             graph->outputs[type].push_back(node);
-            output_count += 1;
+            is_output = true;
         }
     }
-    if (output_count == 0) {
+    if (is_output) {
         printf("[TU_WARN]: cannot add node `%s' as outputs of graph `%s', no common output type found.\n",
                node->name, graph->name);
+    } else {
+        node->sink_graph = graph;
     }
     return true;
 }
@@ -324,20 +337,30 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
 }
 
 // TODO(CACHE): bool tu_internal_worker_cache(worker, &graph_data);
-void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type) {
+void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     if (!ptr_arg_check(exec_ctx)) return;
-    if (!ptr_arg_check(data)) return;
+    if (!ptr_arg_check(ptr)) return;
     TU_GraphNode *node = exec_ctx->node;
     // TU_DfgWorker *worker = exec_ctx->worker;
+    TU_GraphData data{ptr, type};
+    bool result_sinked = false;
+
+    if (node->sink_graph != nullptr && node->sink_graph->outputs.contains(type)) {
+        node->sink_graph->results_queue.push(data);
+        node->sink_graph->results_cond->notify_all();
+        result_sinked = true;
+    }
+
     if (!node->successors.contains(type)) {
-        printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
-               type, node->name);
+        if (!result_sinked) {
+            printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
+                   type, node->name);
+        }
         return;
     }
     // TODO(CACHE): try to use the worker cache
-    TU_GraphData gdata{data, type};
     for (TU_GraphNode *successor : node->successors[type]) {
-        tu_internal_node_enqueue(successor, &gdata);
+        tu_internal_node_enqueue(successor, &data);
     }
 }
 
@@ -376,6 +399,10 @@ bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
     case TU_GRAPH_NODE_KIND_GRAPH: assert(false && "cannot dequeue a graph"); break;
     }
     return false;
+}
+
+void tu_internal_graph_connect_sink(TU_Graph *graph, TU_Cond *cond) {
+    graph->results_cond = cond;
 }
 
 // this is set appart because it might be moved elsewhere

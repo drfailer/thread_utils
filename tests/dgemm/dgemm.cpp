@@ -4,10 +4,12 @@
 #include <functional>
 #include <blas.hpp>
 #include "thread_utils/thread_utils.hpp"
+#include "dfg_dgemm.hpp"
 #include "matrix.hpp"
 #include "timer.hpp"
+#include "defer.hpp"
 
-constexpr size_t M = 10000, N = 10000, K = 10000, TILE_SIZE = 512;
+constexpr size_t M = 16, N = 16, K = 16, TILE_SIZE = 4;
 // #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -48,7 +50,7 @@ void run_lambda(TU_TaskManagerContext tm_ctx, void *ctx, void *data, tu_i64 type
     lambda->operator()(tm_ctx, nullptr, data, type);
 }
 
-void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
+void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {// {{{
     std::vector<TileTriplet> tiles;
     TU_TaskManager tm;
 
@@ -241,7 +243,7 @@ void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     tu_tm_print_profile_infos(&tm);
     tu_tm_state_print_profile_infos(&product_state_cxt, "product_state");
     tu_tm_state_print_profile_infos(&sum_state_ctx, "sum_state");
-}
+}// }}}
 
 void test_dgemm_tm(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     printf("\nrunning tm dgemm...\n");
@@ -259,41 +261,73 @@ void test_dgemm_tm(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     printf("dgemm_tm(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
-enum Types : tu_i64 {
-    T_MatrixA,
-    T_MatrixB,
-    T_MatrixC,
-    T_TileA,
-    T_TileB,
-    T_TileC,
-    T_TileP,
-    T_ABPTiles,
-    T_PCTiles,
-};
-
 void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
-    TU_Graph graph = tu_graph("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
-    TU_Dfg dfg(&graph);
+    assert(A.rows == C.rows);
+    assert(B.cols == C.cols);
+    assert(A.cols == B.rows);
 
-    auto split_task    = tu_task(&graph, "split_task", nullptr, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, 0);
-    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, 0);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_TileC}, 0);
-    auto product_state = tu_state(&graph, "product_state", nullptr, {T_TileA, T_TileB}, {T_ABPTiles}, 0);
-    auto sum_state     = tu_state(&graph, "sum_state", nullptr, {T_TileC, T_TileP}, {T_PCTiles, T_TileC}, 0);
+    size_t TM = C.rows / TILE_SIZE + (C.rows % TILE_SIZE == 0 ? 0 : 1);
+    size_t TN = C.cols / TILE_SIZE + (C.cols % TILE_SIZE == 0 ? 0 : 1);
+    size_t TK = A.cols / TILE_SIZE + (A.cols % TILE_SIZE == 0 ? 0 : 1);
 
-    tu_exec(split_task, T_MatrixA, nullptr); // TODO
-    tu_exec(split_task, T_MatrixB, nullptr); // TODO
-    tu_exec(split_task, T_MatrixC, nullptr); // TODO
+    TU_Dfg dfg = tu_dfg_create();
+    defer(tu_dfg_destroy(&dfg));
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40);
 
-    tu_exec(product_task, T_ABPTiles, nullptr); // TODO
+    printf("create dfg graph...\n");
+    TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
+    defer(tu_graph_destroy(&graph));
 
-    tu_exec(sum_task, T_PCTiles, nullptr); // TODO
+    printf("build dfg graph...\n");
 
-    tu_exec(product_state, T_TileA, nullptr); // TODO
-    tu_exec(product_state, T_TileB, nullptr); // TODO
+    SplitTaskData split_task_data{
+        .tile_size = TILE_SIZE,
+        .tiles_mem = {
+            std::vector<MatrixTile>(TM * TK),
+            std::vector<MatrixTile>(TK * TN),
+            std::vector<MatrixTile>(TM * TN),
+        },
+        .TM = TM,
+        .TN = TN,
+        .TK = TK,
+    };
 
-    tu_exec(sum_state, T_TileC, nullptr); // TODO
-    tu_exec(sum_state, T_TileP, nullptr); // TODO
+    ProductStateData product_state_data{
+        .A_tiles = std::vector<MatrixTile*>(TM * TK),
+        .B_tiles = std::vector<MatrixTile*>(TK * TN),
+        .TM = TM,
+        .TN = TN,
+        .TK = TK,
+    };
+
+    SumStateData sum_state_data{
+        .sum_queues = std::vector<std::vector<MatrixTile*>>(TM * TN),
+        .C_tiles = std::vector<MatrixTile *>(TM * TN),
+        .count = TM * TN * TK,
+        .TM = TM,
+        .TN = TN,
+        .TK = TK,
+    };
+
+    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, group);
+    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, group);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_TileC}, group);
+    auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, group);
+    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP}, {T_PCTiles, T_TileC}, group);
+
+    tu_exec(split_task, T_MatrixA, &split_task_exec);
+    tu_exec(split_task, T_MatrixB, &split_task_exec);
+    tu_exec(split_task, T_MatrixC, &split_task_exec);
+
+    tu_exec(product_task, T_ABPTiles, &product_task_exec);
+
+    tu_exec(sum_task, T_PCTiles, &sum_task_exec);
+
+    tu_exec(product_state, T_TileA, &product_state_exec_tile_a);
+    tu_exec(product_state, T_TileB, &product_state_exec_tile_b);
+
+    tu_exec(sum_state, T_TileC, &sum_state_exec_tile_c);
+    tu_exec(sum_state, T_TileP, &sum_state_exec_tile_p);
 
     assert(tu_add_inputs(&graph, split_task));
     assert(tu_edges(split_task, product_state));
@@ -304,13 +338,18 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     assert(tu_edges(sum_task, sum_state));
     assert(tu_add_outputs(&graph, sum_state));
 
-    tu_graph_print_to_dot(&graph, "graph.dot");
-
-    assert(false && "create groups + make sure there is a safety and an error message in the lib for this.");
-
     assert(tu_graph_check(&graph));
 
-    tu_graph_destroy(&graph);
+    tu_graph_print_to_dot(&graph, "graph.dot");
+
+    printf("run dfg graph...\n");
+    tu_dfg_exec(&dfg, &graph);
+    tu_dfg_push_data(&dfg, &A, T_MatrixA);
+    tu_dfg_push_data(&dfg, &B, T_MatrixB);
+    tu_dfg_push_data(&dfg, &C, T_MatrixC);
+    tu_dfg_wait_result(&dfg); // only one result before termination
+    printf("stop dfg...\n");
+    tu_dfg_term(&dfg);
 }
 
 #ifdef DGEMM_HH

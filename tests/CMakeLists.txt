@@ -14,7 +14,7 @@ if(NOT TBB)
     set(TBB "")
 endif()
 
-add_executable(dgemm dgemm/dgemm.cpp common/matrix.cpp)
+add_executable(dgemm dgemm/dgemm.cpp dgemm/dfg_dgemm.cpp common/matrix.cpp)
 target_link_libraries(dgemm PRIVATE thread_utils openblas ${TBB} atomic)
 
 add_executable(hadamard hadamard/hadamard.cpp common/matrix.cpp)

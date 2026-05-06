@@ -354,6 +354,12 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
 }
 
 // FIXME: this function should be defined elsewhere
+static void tu_internal_node_notify_result(TU_DfgContext *dfg_ctx) {
+    assert(dfg_ctx->dfg != nullptr);
+    dfg_ctx->dfg->cond.notify_all();
+}
+
+// FIXME: this function should be defined elsewhere
 // TODO(CACHE): bool tu_internal_worker_cache(worker, &graph_data);
 void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     if (!ptr_arg_check(exec_ctx)) return;
@@ -368,7 +374,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     // when there are no extra receivers
     if (node->sink_graph != nullptr && node->sink_graph->outputs.contains(type)) {
         node->sink_graph->results_queue.push(data);
-        exec_ctx->dfg_ctx.dfg->cond.notify_all();
+        tu_internal_node_notify_result(&exec_ctx->dfg_ctx);
         result_sinked = true;
     }
 

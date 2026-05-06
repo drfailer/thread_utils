@@ -7,13 +7,12 @@ static void worker_start(TU_DfgWorker *worker);
 static void worker_stop(TU_DfgWorker *worker);
 static void worker_run(TU_DfgWorker *worker);
 
-void tu_dfg_init(TU_Dfg *dfg, TU_Graph *graph) {
-    if (!ptr_arg_check(dfg)) return;
-    if (!ptr_arg_check(graph)) return;
-    dfg->graph = graph;
+TU_Dfg tu_dfg_create() {
+    TU_Dfg dfg{};
+    return dfg;
 }
 
-void tu_dfg_fini(TU_Dfg *dfg) {}
+void tu_dfg_destroy(TU_Dfg *) {}
 
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count) {
     if (!ptr_arg_check(dfg)) return 0;
@@ -32,12 +31,12 @@ tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count) {
     return group_id;
 }
 
-void tu_dfg_start(TU_Dfg *dfg) {
-    if (dfg->graph == nullptr) {
-        printf("[TU_ERROR]: cannot start a null graph.\n");
-        return;
-    }
+void tu_dfg_exec(TU_Dfg *dfg, TU_Graph *graph) {
+    if (!ptr_arg_check(dfg)) return;
+    if (!ptr_arg_check(graph)) return;
+    dfg->graph = graph;
     for (auto &group : dfg->groups) {
+        group.nodes.clear(); // we do this here because group_register_nodes is recursive
         group_register_nodes(&group, dfg->graph);
         for (auto &worker : group.workers) {
             worker_start(&worker);
@@ -45,7 +44,7 @@ void tu_dfg_start(TU_Dfg *dfg) {
     }
 }
 
-void tu_dfg_stop(TU_Dfg *dfg) {
+void tu_dfg_term(TU_Dfg *dfg) {
     assert(dfg->graph != nullptr);
     for (auto &group : dfg->groups) {
         for (auto &worker : group.workers) {
@@ -56,6 +55,7 @@ void tu_dfg_stop(TU_Dfg *dfg) {
             worker_stop(&worker);
         }
     }
+    dfg->graph = nullptr;
 }
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
@@ -126,20 +126,69 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     node->execs[data->type](&exec_ctx, data->data, data->type);
 }
 
+static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
+    assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
+    TU_GraphState *state = node->sub_type.state;
+
+    assert(data->data != nullptr);
+
+    // the data is moved from the main state queue to the protected queue that
+    // is own by one worker (MPSC). Data needs to be dequeued from the main
+    // queue to avoid workers decrementing the group semaphore for nothing and
+    // end up dead locked.
+    state->protected_queue.push(*data);
+
+    // we use memory_order_acq_rel to make sure the counter is properly
+    // synchronized between the threads and makes sure at least one thread gets
+    // the ownership on the queue.
+    if (state->counter.fetch_add(1, std::memory_order_acq_rel) == 0) {
+        printf("worker %ld takes ownership of state %s\n", worker->id, node->name);
+        // the thread takes the ownership of the state
+        for (;;) {
+            TU_GraphData local_data;
+            if (worker->can_terminate.load()) {
+                printf("worker %ld, owner of state %p can terminate (counter = %ld, node = %s).\n",
+                        worker->id, state, state->counter.load(), node->name);
+                return;
+            }
+            while (state->protected_queue.pop(&local_data)) {
+                worker_node_exec(worker, node, &local_data);
+                // memory_order_acq_rel makes sure that either we see the
+                // increment of another thread (avoid leaving too early), or
+                // that other threads see the decrement (guaranties that this
+                // thread keeps the ownership or that another threads get it:
+                // in any case, one thread should have the ownership if the
+                // queue is not empty).
+                if (state->counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+                    printf("worker %ld releases state %s\n", worker->id, node->name);
+                    return;
+                }
+            }
+            // The queue is empty but the counter has been incremented by
+            // another thread so we wait until we can pop again. This avoid
+            // leaving while the queue is not empty
+            std::atomic_thread_fence(std::memory_order_acquire);
+            cross_platform_yield();
+        }
+    }
+}
+
 static void worker_process_queues(TU_DfgWorker *worker) {
     // TODO: compute the start and end position based on the worker id
     size_t start_node_idx = 0;
     size_t end_node_idx = worker->group->nodes.size();
-    TU_GraphData data;
     for (size_t node_idx = start_node_idx; node_idx < end_node_idx;) {
         TU_GraphNode *node = worker->group->nodes[node_idx];
+        TU_GraphData data = {};
         if (!tu_internal_node_dequeue(node, &data)) {
             node_idx += 1;
-            // TODO: process the cache
             continue;
         }
-        worker_node_exec(worker, node, &data);
-        // TODO: state edge case
+        if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
+            worker_process_state(worker, node, &data);
+        } else {
+            worker_node_exec(worker, node, &data);
+        }
         // TODO: process the cache
         // TODO: if the worker is on its region, continue dequeuing, otherwise reset the loop
     }
@@ -150,7 +199,6 @@ static void worker_run(TU_DfgWorker *worker) {
     assert(worker->group->dfg != nullptr);
     for (;;) {
         worker->parked.store(true);
-        worker->group->dfg->cond.notify_all();
         worker->group->sem.acquire();
         if (worker->can_terminate.load()) {
             break;

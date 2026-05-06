@@ -48,17 +48,21 @@ struct TU_Dfg {
     TU_Cond cond;
     TU_Array<TU_DfgWorkerGroup> groups = {};
     TU_Graph *graph = nullptr;
+
+    // constructors
+    TU_Dfg() = default;
+    TU_Dfg(TU_Dfg const &) = delete;
+    TU_Dfg(TU_Dfg &&other) : groups(std::move(other.groups)), graph(other.graph) {}
 };
 
-// TODO: the graph might be internal at some point
-
-void tu_dfg_init(TU_Dfg *dfg, TU_Graph *graph);
-void tu_dfg_fini(TU_Dfg *dfg);
+// TODO(C_INTERFACE): will allocate
+TU_Dfg tu_dfg_create();
+void tu_dfg_destroy(TU_Dfg *dfg);
 
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count);
 
-void tu_dfg_start(TU_Dfg *dfg);
-void tu_dfg_stop(TU_Dfg *dfg);
+void tu_dfg_exec(TU_Dfg *dfg, TU_Graph *graph);
+void tu_dfg_term(TU_Dfg *dfg);
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *data, TU_TypeId type);
 TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg);

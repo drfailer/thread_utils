@@ -57,13 +57,12 @@ enum Types : tu_i64 {
 };
 
 void dfg_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
+    TU_Dfg dfg = tu_dfg_create();
+    defer(tu_dfg_destroy(&dfg));
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40);
+
     TU_Graph graph = tu_graph_create("hadamard", {T_ABCTiles}, {T_ABCTiles});
     defer(tu_graph_destroy(&graph));
-
-    TU_Dfg dfg;
-    tu_dfg_init(&dfg, &graph);
-    defer(tu_dfg_fini(&dfg));
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40);
 
     auto product_task = tu_task(&graph, "product_task", nullptr, {T_ABCTiles}, {T_ABCTiles}, group);
 
@@ -87,7 +86,7 @@ void dfg_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
 
     printf("starting dfg...\n");
-    tu_dfg_start(&dfg);
+    tu_dfg_exec(&dfg, &graph);
 
     size_t tile_count = 0;
     for (size_t i = 0; i < C.rows; i += tile_size) {
@@ -118,7 +117,7 @@ void dfg_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
         // printf("result: %ld/%ld\n", i + 1, tile_count);
     }
     printf("stop dfg...\n");
-    tu_dfg_stop(&dfg);
+    tu_dfg_term(&dfg);
     printf("dfg stopped\n");
 }
 

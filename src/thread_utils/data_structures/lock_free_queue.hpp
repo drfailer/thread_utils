@@ -75,7 +75,7 @@ TU_LockFreeQueue<T>::TU_LockFreeQueue() {
     this->head_.store({node, 0});
     this->tail_.store({node, 0});
     if (!this->head_.is_lock_free()) {
-        printf("[TU_ERRO]: 16 bits atomics are not available on this platform (default to internal mutex).\n");
+        // printf("[TU_ERRO]: 16 bits atomics are not available on this platform (default to internal mutex).\n");
     }
 }
 

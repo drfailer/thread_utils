@@ -78,6 +78,7 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver);
 
 // add result in exec function (send data to successors)
 void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type);
+void *tu_node_data(TU_ExecContext *exec_ctx);
 
 void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
 

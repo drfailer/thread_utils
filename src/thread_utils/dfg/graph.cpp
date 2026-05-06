@@ -391,6 +391,11 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     }
 }
 
+void *tu_node_data(TU_ExecContext *exec_ctx) {
+    assert(exec_ctx->node != nullptr);
+    return exec_ctx->node->data;
+}
+
 // FIXME: this function should be defined elsewhere
 static void tu_internal_node_notify_workers(TU_DfgContext *dfg_ctx, TU_GraphNode *node) {
     if (node->kind != TU_GRAPH_NODE_KIND_GRAPH) {
@@ -434,7 +439,7 @@ bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
             }
         }
     } break;
-    case TU_GRAPH_NODE_KIND_STATE: return node->sub_type.state->queue.pop(data); break;
+    case TU_GRAPH_NODE_KIND_STATE: return node->sub_type.state->queue.pop(data);
     case TU_GRAPH_NODE_KIND_GRAPH: assert(false && "cannot dequeue a graph"); break;
     }
     return false;
@@ -452,7 +457,7 @@ static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t l
     if (level == 0) {
         fs << "digraph " << ADDR(graph) << "{" << std::endl;
         // source
-        fs << "source [label="",width=.1,shape=circle];" << std::endl;
+        fs << "source [label=\"\",width=.1,shape=circle];" << std::endl;
         for (auto [type, inputs] : graph->inputs) {
             std::string edge = "source" + std::to_string(type);
             fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;

@@ -25,6 +25,7 @@ struct TU_GraphTask {
 struct TU_GraphState {
     alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
     TU_GraphNodeQueue queue = {};
+    TU_GraphNodeQueue protected_queue = {};
     TU_ProfQueueInfos prof_queue = {};
 };
 

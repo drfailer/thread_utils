@@ -85,6 +85,7 @@ TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg) {
     return result;
 }
 
+// TODO: this should not be done this way
 static void group_register_nodes(TU_DfgWorkerGroup *group, TU_Graph *graph) {
     assert(group != nullptr);
     assert(graph != nullptr);
@@ -93,8 +94,6 @@ static void group_register_nodes(TU_DfgWorkerGroup *group, TU_Graph *graph) {
             group_register_nodes(group, node->sub_type.graph);
         } else if (node->b_exec->group == group->id) {
             group->nodes.push_back(node);
-        } else {
-            assert(false && "unreachable");
         }
     }
 }

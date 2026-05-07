@@ -146,15 +146,9 @@ static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_Gr
     // synchronized between the threads and makes sure at least one thread gets
     // the ownership on the queue.
     if (state->counter.fetch_add(1, std::memory_order_acq_rel) == 0) {
-        printf("worker %ld takes ownership of state %s\n", worker->id, node->name);
         // the thread takes the ownership of the state
         for (;;) {
             TU_GraphData local_data;
-            if (worker->can_terminate.load()) {
-                printf("worker %ld, owner of state %p can terminate (counter = %ld, node = %s).\n",
-                        worker->id, state, state->counter.load(), node->name);
-                return;
-            }
             while (state->protected_queue.pop(&local_data)) {
                 worker_node_exec(worker, node, &local_data);
                 // memory_order_acq_rel makes sure that either we see the
@@ -164,7 +158,6 @@ static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_Gr
                 // in any case, one thread should have the ownership if the
                 // queue is not empty).
                 if (state->counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                    printf("worker %ld releases state %s\n", worker->id, node->name);
                     return;
                 }
             }

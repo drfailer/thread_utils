@@ -1,8 +1,6 @@
 #include "dfg.hpp"
 #include "log.hpp"
 
-static void group_register_nodes(TU_DfgWorkerGroup *group, TU_Graph *graph);
-
 static void worker_start(TU_DfgWorker *worker);
 static void worker_stop(TU_DfgWorker *worker);
 static void worker_run(TU_DfgWorker *worker);

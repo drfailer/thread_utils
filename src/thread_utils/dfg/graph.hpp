@@ -16,52 +16,60 @@ enum TU_GraphNodeKind {
 
 // NOTE: the queue belongs to the task and state to allow different queue implementations for both
 
+struct TU_GraphSink {
+    TU_GraphNodeQueue result_queue = {};
+};
+
+// This struct is called base, but it is also a behavior (nodes that have this
+// field to null don't implement the behavior, it is more flexible than a
+// base).
+struct TU_GraphExecNodeBase {
+    TU_Map<TU_TypeId, TU_GraphNodeQueue> queues = {};
+    TU_Map<TU_TypeId, TU_NodeExec> execs = {};
+    TU_Map<TU_TypeId, TU_Set<TU_GraphNode *>> successors = {};
+    TU_GraphSink *sink = nullptr;
+    tu_u64 group = 0;
+};
+
 struct TU_GraphTask {
-    // TODO: considering the low number of types, we should use a sorted vector here
-    TU_Map<TU_TypeId, TU_GraphNodeQueue> queues = {}; // for the task, we group the input data per type
     TU_ProfQueueInfos prof_queue = {};
+    void *data = nullptr;
 };
 
 struct TU_GraphState {
     alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
-    TU_GraphNodeQueue queue = {};
     TU_GraphNodeQueue protected_queue = {};
     TU_ProfQueueInfos prof_queue = {};
+    void *data = nullptr;
 };
 
 struct TU_Graph {
     TU_Array<TU_GraphNode *> nodes = {};
-    // TODO we will need to use sets here to avoid adding inputs/outputs multiple times
-    TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> inputs = {};
-    TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> outputs = {};
-    TU_GraphNodeQueue results_queue = {};
+    TU_Map<TU_TypeId, TU_Set<TU_GraphNode *>> inputs = {};
+    TU_Map<TU_TypeId, TU_Set<TU_GraphNode *>> outputs = {};
+    TU_GraphSink sink;
     const char *name = "Graph";
-    TU_Graph(const char *name) : name(name) {}
 };
 
 struct TU_GraphNode {
+    TU_GraphExecNodeBase *b_exec;
     TU_GraphNodeKind kind;
     union { // we have to use pointers for the union
         TU_GraphTask *task;
         TU_GraphState *state;
         TU_Graph *graph;
     } sub_type;
-    const char *name;
+    const char *name = "";
     TU_Graph *graph = nullptr;
-    TU_Graph *sink_graph = nullptr;
-    void *data = nullptr;
-    tu_u64 group = 0;
-    TU_Map<TU_TypeId, TU_NodeExec> execs = {};
-    TU_Map<TU_TypeId, TU_Array<TU_GraphNode *>> successors = {};
 };
 
-TU_Graph tu_graph_create(const char *name, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types);
+TU_Graph tu_graph_create(const char *name, TU_Set<TU_TypeId> const &input_types, TU_Set<TU_TypeId> const &output_types);
 void tu_graph_destroy(TU_Graph *graph);
 
 bool tu_graph_check(TU_Graph *graph);
 
-TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types, tu_u64 dfg_group);
-TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Array<TU_TypeId> input_types, TU_Array<TU_TypeId> output_types, tu_u64 dfg_group);
+TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types, TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group);
+TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types, TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group);
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph);
 
 // add exec function for a type to a node

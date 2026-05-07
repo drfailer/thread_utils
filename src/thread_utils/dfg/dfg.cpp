@@ -72,7 +72,8 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
         .worker = nullptr,
     };
     for (auto input_node : dfg->graph->inputs[type]) {
-        dfg_ctx.group = &dfg->groups[input_node->group];
+        assert(input_node->b_exec != nullptr);
+        dfg_ctx.group = &dfg->groups[input_node->b_exec->group];
         tu_internal_node_enqueue(&dfg_ctx, input_node, &data);
     }
 }
@@ -80,7 +81,7 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
 TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg) {
     TU_Lock lck(dfg->mutex);
     TU_GraphData result;
-    dfg->cond.wait(lck, [&](){ return dfg->graph->results_queue.pop(&result); });
+    dfg->cond.wait(lck, [&](){ return dfg->graph->sink.result_queue.pop(&result); });
     return result;
 }
 
@@ -90,8 +91,10 @@ static void group_register_nodes(TU_DfgWorkerGroup *group, TU_Graph *graph) {
     for (TU_GraphNode *node : graph->nodes) {
         if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
             group_register_nodes(group, node->sub_type.graph);
-        } else if (node->group == group->id) {
+        } else if (node->b_exec->group == group->id) {
             group->nodes.push_back(node);
+        } else {
+            assert(false && "unreachable");
         }
     }
 }
@@ -114,7 +117,8 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     assert(worker != nullptr);
     assert(node != nullptr);
     assert(data != nullptr);
-    assert(node->execs.contains(data->type));
+    assert(node->b_exec != nullptr);
+    assert(node->b_exec->execs.contains(data->type));
     TU_ExecContext exec_ctx = {
         .node = node,
         .dfg_ctx = {
@@ -123,7 +127,7 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
             .worker = worker,
         },
     };
-    node->execs[data->type](&exec_ctx, data->data, data->type);
+    node->b_exec->execs[data->type](&exec_ctx, data->data, data->type);
 }
 
 static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {

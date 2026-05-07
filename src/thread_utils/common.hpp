@@ -7,8 +7,9 @@
 #include <atomic>
 #include <vector>
 #include <map>
-#include <stdint.h>
+#include <set>
 #include <new>
+#include <stdint.h>
 
 // use to padd atomics in the queues
 // constexpr size_t CACHE_LINE = std::hardware_destructive_interference_size;
@@ -27,6 +28,9 @@ using TU_Atomic = std::atomic<T>;
 
 template <typename T>
 using TU_Array = std::vector<T>;
+
+template <typename T>
+using TU_Set = std::set<T>;
 
 template <typename K, typename V>
 using TU_Map = std::map<K, V>;

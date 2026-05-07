@@ -273,7 +273,11 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     timer_start(dgemm_dfg);
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40);
+    tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3);
+    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40);
+    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10);
+    tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1);
+    tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1);
 
     printf("create dfg graph...\n");
     TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
@@ -310,11 +314,11 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
         .TK = TK,
     };
 
-    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, group);
-    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, group);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, group);
-    auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, group);
-    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, group);
+    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group);
+    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group);
+    auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, product_state_group);
+    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, sum_state_group);
 
     tu_exec(split_task, T_MatrixA, &split_task_exec);
     tu_exec(split_task, T_MatrixB, &split_task_exec);

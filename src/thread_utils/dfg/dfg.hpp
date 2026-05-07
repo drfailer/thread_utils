@@ -52,7 +52,8 @@ struct TU_Dfg {
     // constructors
     TU_Dfg() = default;
     TU_Dfg(TU_Dfg const &) = delete;
-    TU_Dfg(TU_Dfg &&other) : groups(std::move(other.groups)), graph(other.graph) {}
+    TU_Dfg(TU_Dfg &&other)
+        : groups(std::move(other.groups)), graph(other.graph) {}
 };
 
 // TODO(C_INTERFACE): will allocate

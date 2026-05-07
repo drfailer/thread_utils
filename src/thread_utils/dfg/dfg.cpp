@@ -46,7 +46,6 @@ static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
                        node->name, node->b_exec->group);
                 return;
             }
-            printf("register node %s in group %ld\n", node->name, node->b_exec->group);
             dfg->groups[node->b_exec->group]->nodes.push_back(node);
         } else if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
             dfg_register_nodes(dfg, node->sub_type.graph);
@@ -197,8 +196,6 @@ static void worker_process_queues(TU_DfgWorker *worker) {
     // TODO: compute the start and end position based on the worker id
     size_t start_node_idx = 0;
     size_t end_node_idx = worker->group->nodes.size();
-    // printf("worker %ld from group %ld start working (node count %ld).\n",
-    //         worker->id, worker->group->id, end_node_idx);
     for (size_t node_idx = start_node_idx; node_idx < end_node_idx;) {
         TU_GraphNode *node = worker->group->nodes[node_idx];
         TU_GraphData data = {};
@@ -209,7 +206,6 @@ static void worker_process_queues(TU_DfgWorker *worker) {
         if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
             worker_process_state(worker, node, &data);
         } else {
-            printf("exec node %s\n", node->name);
             worker_node_exec(worker, node, &data);
         }
         // TODO: process the cache

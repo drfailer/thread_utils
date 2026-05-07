@@ -43,5 +43,6 @@ struct SumStateData {
 };
 void sum_state_exec_tile_c(TU_ExecContext *ctx, void *rawdata, tu_i64 type);
 void sum_state_exec_tile_p(TU_ExecContext *ctx, void *rawdata, tu_i64 type);
+void sum_state_exec_tile_pc_tiles(TU_ExecContext *ctx, void *rawdata, tu_i64 type);
 
 #endif

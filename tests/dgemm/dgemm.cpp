@@ -311,9 +311,9 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, group);
     auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, group);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_TileC}, group);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, group);
     auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, group);
-    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP}, {T_PCTiles, T_TileC}, group);
+    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, group);
 
     tu_exec(split_task, T_MatrixA, &split_task_exec);
     tu_exec(split_task, T_MatrixB, &split_task_exec);
@@ -328,6 +328,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     tu_exec(sum_state, T_TileC, &sum_state_exec_tile_c);
     tu_exec(sum_state, T_TileP, &sum_state_exec_tile_p);
+    tu_exec(sum_state, T_PCTiles, &sum_state_exec_tile_pc_tiles);
 
     assert(tu_add_inputs(&graph, split_task));
     assert(tu_edges(split_task, product_state));

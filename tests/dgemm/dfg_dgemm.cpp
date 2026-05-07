@@ -70,10 +70,7 @@ void sum_task_exec(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
             (*c)(row, col) += (*p)(row, col);
         }
     }
-    // TODO: this is tmp, we will implement proper memory management helpers later
-    delete tiles; // tiles was dynamically allocated in the sum state
-    deallocate_tile(p);
-    tu_result(ctx, c, T_TileC);
+    tu_result(ctx, tiles, type);
 }
 
 void product_state_exec_tile_a(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
@@ -124,19 +121,10 @@ void sum_state_exec_tile_c(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
     size_t TN = task_data->TN;
     size_t c_idx = tile->row * TN + tile->col;
 
-    assert(task_data->C_tiles[c_idx] == nullptr);
-    printf("task_data->count = %ld\n", task_data->count);
-    if (task_data->count == 0) {
-        printf("result!\n");
-        tu_result(ctx, tile, T_TileC);
-        return;
-    }
-
     if (task_data->sum_queues[c_idx].size() > 0) {
         auto p = task_data->sum_queues[c_idx].back();
         task_data->sum_queues[c_idx].pop_back();
         auto tiles = new std::pair<MatrixTile *, MatrixTile *>(p, tile);
-        task_data->count -= 1;
         tu_result(ctx, tiles, T_PCTiles);
     } else {
         task_data->C_tiles[c_idx] = tile;
@@ -155,9 +143,25 @@ void sum_state_exec_tile_p(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
         auto c = task_data->C_tiles[c_idx];
         task_data->C_tiles[c_idx] = nullptr;
         auto tiles = new std::pair<MatrixTile *, MatrixTile *>(tile, c);
-        task_data->count -= 1;
         tu_result(ctx, tiles, T_PCTiles);
     } else {
         task_data->sum_queues[c_idx].push_back(tile);
     }
+}
+
+void sum_state_exec_tile_pc_tiles(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
+    auto task_data = (SumStateData*)tu_node_data(ctx);
+    assert(type == T_PCTiles);
+    auto tiles = (std::pair<MatrixTile *, MatrixTile *>*)rawdata;
+    auto c = tiles->second;
+
+    delete tiles;
+    task_data->count -= 1;
+    printf("task_data->count = %ld\n", task_data->count);
+    if (task_data->count == 0) {
+        printf("result!\n");
+        tu_result(ctx, c, T_TileC);
+        return;
+    }
+    sum_state_exec_tile_c(ctx, c, T_TileC);
 }

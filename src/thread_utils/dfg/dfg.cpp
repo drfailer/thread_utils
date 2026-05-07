@@ -199,7 +199,7 @@ static void worker_process_cache(TU_DfgWorker *worker) {
     }
 }
 
-static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+static void worker_process_task_queue_with_cache(TU_DfgWorker *worker, TU_GraphNode *node) {
     for (;;) {
         for (size_t cache_counter = 0; cache_counter < worker->cache.size; ++cache_counter) {
             TU_GraphData data = {};
@@ -217,6 +217,25 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
         worker_process_cache(worker);
     }
 }
+
+static void worker_process_task_queue_no_cache(TU_DfgWorker *worker, TU_GraphNode *node) {
+    for (;;) {
+        TU_GraphData data = {};
+        if (!tu_internal_node_dequeue(node, &data)) {
+            return;
+        }
+        worker_node_exec(worker, node, &data);
+    }
+}
+
+static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+    if (worker->cache.size > 0) {
+        worker_process_task_queue_with_cache(worker, node);
+    } else {
+        worker_process_task_queue_no_cache(worker, node);
+    }
+}
+
 
 // TODO: we could count the number of workers on each node to try balancing the
 //       workload.

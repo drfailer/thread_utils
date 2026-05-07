@@ -9,8 +9,8 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M_SIZE = 64;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 32;
+constexpr size_t M_SIZE = 10000;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 512;
 // #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -356,8 +356,6 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     tu_graph_check(&graph);
 
-    tu_graph_print_to_dot(&graph, "graph.dot");
-
     printf("run dfg graph...\n");
     tu_dfg_set_graph(&dfg, &graph);
     tu_dfg_exec(&dfg);
@@ -368,6 +366,8 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     printf("stop dfg...\n");
     tu_dfg_term(&dfg);
     timer_end(dgemm_dfg);
+
+    tu_graph_print_to_dot(&graph, "graph.dot");
 
     timer_report(dgemm_dfg);
     matrix_print(C);
@@ -417,7 +417,7 @@ int main(int, char **) {
     // matmul(A, B, E);
     // matrix_print(E);
 
-    // openblas_set_num_threads(1);
+    openblas_set_num_threads(1);
 
     // matrix_zero(C);
     // test_dgemm_tm(A, B, C, E);

@@ -419,24 +419,10 @@ void *tu_node_data(TU_ExecContext *exec_ctx) {
 
 // FIXME: this function should be defined elsewhere
 static void tu_internal_node_notify_workers(TU_DfgContext *dfg_ctx, TU_GraphNode *node) {
-    if (node->kind != TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->b_exec != nullptr) {
         assert(dfg_ctx->dfg != nullptr);
         dfg_ctx->dfg->groups[node->b_exec->group].sem.release();
     }
-}
-
-static void exec_base_enqueue(TU_GraphExecNodeBase *b_exec, TU_GraphData *data) {
-    assert(b_exec->queues.contains(data->type));
-    b_exec->queues[data->type].push(*data);
-}
-
-static bool exec_base_dequeue(TU_GraphExecNodeBase *b_exec, TU_GraphData *data) {
-    for (auto &[type, queue] : b_exec->queues) {
-        if (queue.pop(data)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 // FIXME: this function should be defined elsewhere
@@ -444,21 +430,9 @@ static bool exec_base_dequeue(TU_GraphExecNodeBase *b_exec, TU_GraphData *data) 
 void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return;
     if (!ptr_arg_check(data)) return;
-    switch (node->kind) {
-    case TU_GRAPH_NODE_KIND_TASK:
-    case TU_GRAPH_NODE_KIND_STATE:
-        assert(node->b_exec != nullptr);
-        exec_base_enqueue(node->b_exec, data);
-        break;
-    case TU_GRAPH_NODE_KIND_GRAPH: {
-        // we don't have a dedicated source node so we allow enqueueing to a
-        // graph when pushing data
-        assert(node->sub_type.graph->inputs.contains(data->type));
-        for (auto input_node : node->sub_type.graph->inputs[data->type]) {
-            tu_internal_node_enqueue(dfg_ctx, input_node, data);
-        }
-    } break;
-    }
+    assert(node->b_exec != nullptr);
+    assert(node->b_exec->queues.contains(data->type));
+    node->b_exec->queues[data->type].push(*data);
     tu_internal_node_notify_workers(dfg_ctx, node);
 }
 
@@ -466,10 +440,11 @@ void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_Gra
 bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data) {
     if (!ptr_arg_check(node)) return false;
     if (!ptr_arg_check(data)) return false;
-    switch (node->kind) {
-    case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
-    case TU_GRAPH_NODE_KIND_STATE: return exec_base_dequeue(node->b_exec, data);
-    case TU_GRAPH_NODE_KIND_GRAPH: assert(false && "cannot dequeue a graph"); break;
+    assert(node->b_exec != nullptr);
+    for (auto &[type, queue] : node->b_exec->queues) {
+        if (queue.pop(data)) {
+            return true;
+        }
     }
     return false;
 }

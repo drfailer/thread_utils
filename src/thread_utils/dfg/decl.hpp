@@ -8,6 +8,7 @@
 #include "../tools/profiling.hpp"
 
 struct TU_Graph;
+struct TU_GraphExecNodeBase;
 struct TU_GraphTask;
 struct TU_GraphState;
 struct TU_GraphNode;
@@ -31,7 +32,8 @@ struct TU_GraphOperation {
     TU_GraphNode *node;
 };
 
-using TU_GraphNodeQueue = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
+using TU_GraphNodeQueueImpl = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
+using TU_GraphNodeQueue = TU_ProfiledQueue<TU_GraphNodeQueueImpl>;
 
 struct TU_DfgContext {
     TU_Dfg *dfg;

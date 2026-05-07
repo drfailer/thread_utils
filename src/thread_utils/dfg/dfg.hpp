@@ -39,7 +39,7 @@ struct TU_DfgWorkerGroup {
     TU_DfgWorkerGroup(TU_DfgWorkerGroup const &) = delete;
     TU_DfgWorkerGroup(TU_DfgWorkerGroup &&other)
         : sem(0), workers(std::move(other.workers)), dfg(other.dfg),
-          id(other.id) {}
+          id(other.id), nodes(std::move(other.nodes)) {}
 };
 
 // graph runner

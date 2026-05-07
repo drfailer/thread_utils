@@ -125,6 +125,7 @@ void tu_graph_destroy(TU_Graph *graph) {
            // subgraphs are created by the user, therefore, we don't delete them here.
            break;
         }
+        delete node->b_exec;
         delete node;
     }
 }
@@ -359,8 +360,7 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
 
     // for standard nodes, we connect all the common types
     assert(receiver->b_exec != nullptr);
-    for (auto exec : receiver->b_exec->execs) {
-        TU_TypeId type = exec.first;
+    for (auto [type, exec] : receiver->b_exec->execs) {
         if (sender->b_exec->successors.contains(type)) {
             sender->b_exec->successors[type].insert(receiver);
         }

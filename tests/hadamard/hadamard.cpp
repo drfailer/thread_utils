@@ -86,7 +86,8 @@ void dfg_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
 
 
     printf("starting dfg...\n");
-    tu_dfg_exec(&dfg, &graph);
+    tu_dfg_set_graph(&dfg, &graph);
+    tu_dfg_exec(&dfg);
 
     size_t tile_count = 0;
     for (size_t i = 0; i < C.rows; i += tile_size) {

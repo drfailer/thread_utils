@@ -273,15 +273,24 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     timer_start(dgemm_dfg);
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
+
     tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3);
-    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40);
-    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10);
+    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 4);
+    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 1);
     tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1);
     tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1);
 
+    // tu_u64 group = tu_dfg_add_worker_group(&dfg, 4);
+    // tu_u64 split_group = group;
+    // tu_u64 product_group = group;
+    // tu_u64 sum_group = group;
+    // tu_u64 product_state_group = group;
+    // tu_u64 sum_state_group = group;
+
+
     printf("create dfg graph...\n");
     TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
-    defer(tu_graph_destroy(&graph));
+    // defer(tu_graph_destroy(&graph));
 
     printf("build dfg graph...\n");
 
@@ -349,7 +358,8 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_graph_print_to_dot(&graph, "graph.dot");
 
     printf("run dfg graph...\n");
-    tu_dfg_exec(&dfg, &graph);
+    tu_dfg_set_graph(&dfg, &graph);
+    tu_dfg_exec(&dfg);
     tu_dfg_push_data(&dfg, &A, T_MatrixA);
     tu_dfg_push_data(&dfg, &B, T_MatrixB);
     tu_dfg_push_data(&dfg, &C, T_MatrixC);

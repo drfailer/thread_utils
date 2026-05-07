@@ -153,7 +153,7 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     tu_internal_exec_end(node->b_exec, &sw);
 }
 
-static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
+static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
     assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
     TU_GraphState *state = node->sub_type.state;
 
@@ -199,6 +199,27 @@ static void worker_process_cache(TU_DfgWorker *worker) {
     }
 }
 
+static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+    for (;;) {
+        for (size_t cache_counter = 0; cache_counter < worker->cache.size; ++cache_counter) {
+            TU_GraphData data = {};
+            if (!tu_internal_node_dequeue(node, &data)) {
+                break;
+            }
+            TU_GraphOperation op{data, node};
+            TU_GraphOperation poped_op; // unused
+            bool poped = worker->cache.cache(op, &poped_op);
+            assert(poped == false);
+        }
+        if (worker->cache.count() == 0) {
+            return;
+        }
+        worker_process_cache(worker);
+    }
+}
+
+// TODO: we could count the number of workers on each node to try balancing the
+//       workload.
 static void worker_process_queues(TU_DfgWorker *worker) {
     // TODO: compute the start and end position based on the worker id
     size_t start_node_idx = 0;
@@ -206,17 +227,16 @@ static void worker_process_queues(TU_DfgWorker *worker) {
     for (size_t node_idx = start_node_idx; node_idx < end_node_idx;) {
         TU_GraphNode *node = worker->group->nodes[node_idx];
         TU_GraphData data = {};
-        if (!tu_internal_node_dequeue(node, &data)) {
+        if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
+            worker_process_task_queue(worker, node);
             node_idx += 1;
-            continue;
-        }
-        if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
-            worker_process_state(worker, node, &data);
         } else {
-            worker_node_exec(worker, node, &data);
+            // TODO: this is dangerous
+            while (tu_internal_node_dequeue(node, &data)) {
+                worker_exec_state(worker, node, &data);
+            }
+            node_idx += 1;
         }
-        worker_process_cache(worker);
-        // TODO: if the worker is on its region, continue dequeuing, otherwise reset the loop
     }
 }
 

@@ -14,7 +14,8 @@ struct TU_DfgWorker {
     TU_Thread thread;
     TU_DfgWorkerGroup *group = nullptr;
     tu_u64 id = 0;
-    TU_CacheQueue<TU_GraphOperation> cache{4};
+    // TODO: the cache size should be configurable (maybe through the add group function)
+    TU_CacheQueue<TU_GraphOperation> cache{16};
     alignas(CACHE_LINE) TU_AtomicFlag parked = true;
     alignas(CACHE_LINE) TU_AtomicFlag can_terminate = false;
 

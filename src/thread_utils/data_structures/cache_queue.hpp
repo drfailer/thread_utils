@@ -29,6 +29,7 @@ struct TU_CacheQueue {
     ~TU_CacheQueue();
     bool cache(T new_value, T *poped_value);
     bool pop(T *result);
+    size_t count() const;
 };
 
 template <typename T>
@@ -69,6 +70,11 @@ bool TU_CacheQueue<T>::pop(T *result) {
     this->tail -= 1;
     *result = this->data[this->tail & mask];
     return true;
+}
+
+template <typename T>
+size_t TU_CacheQueue<T>::count() const {
+    return this->tail - this->head;
 }
 
 #endif

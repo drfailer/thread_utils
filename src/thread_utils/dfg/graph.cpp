@@ -421,7 +421,7 @@ void *tu_node_data(TU_ExecContext *exec_ctx) {
 static void tu_internal_node_notify_workers(TU_DfgContext *dfg_ctx, TU_GraphNode *node) {
     if (node->b_exec != nullptr) {
         assert(dfg_ctx->dfg != nullptr);
-        dfg_ctx->dfg->groups[node->b_exec->group].sem.release();
+        dfg_ctx->dfg->groups[node->b_exec->group]->sem.release();
     }
 }
 

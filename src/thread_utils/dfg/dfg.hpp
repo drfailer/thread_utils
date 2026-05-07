@@ -33,27 +33,24 @@ struct TU_DfgWorkerGroup {
     TU_Dfg *dfg = nullptr;
     tu_u64 id = 0;
     TU_Array<TU_GraphNode *> nodes = {};
-
-    // constructors
-    TU_DfgWorkerGroup() = default;
-    TU_DfgWorkerGroup(TU_DfgWorkerGroup const &) = delete;
-    TU_DfgWorkerGroup(TU_DfgWorkerGroup &&other)
-        : sem(0), workers(std::move(other.workers)), dfg(other.dfg),
-          id(other.id), nodes(std::move(other.nodes)) {}
 };
 
 // graph runner
 struct TU_Dfg {
     TU_Mutex mutex;
     TU_Cond cond;
-    TU_Array<TU_DfgWorkerGroup> groups = {};
+    TU_Array<TU_DfgWorkerGroup *> groups = {};
     TU_Graph *graph = nullptr;
 
     // constructors
     TU_Dfg() = default;
     TU_Dfg(TU_Dfg const &) = delete;
-    TU_Dfg(TU_Dfg &&other)
-        : groups(std::move(other.groups)), graph(other.graph) {}
+    TU_Dfg(TU_Dfg &&other) : groups(std::move(other.groups)), graph(other.graph) {}
+    ~TU_Dfg() {
+        for (auto group : groups) {
+            delete group;
+        }
+    }
 };
 
 // TODO(C_INTERFACE): will allocate
@@ -62,7 +59,9 @@ void tu_dfg_destroy(TU_Dfg *dfg);
 
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count);
 
-void tu_dfg_exec(TU_Dfg *dfg, TU_Graph *graph);
+void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph);
+void tu_dfg_clear(TU_Dfg *dfg);
+void tu_dfg_exec(TU_Dfg *dfg);
 void tu_dfg_term(TU_Dfg *dfg);
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *data, TU_TypeId type);

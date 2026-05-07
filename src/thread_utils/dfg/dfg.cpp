@@ -17,28 +17,63 @@ void tu_dfg_destroy(TU_Dfg *) {}
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count) {
     if (!ptr_arg_check(dfg)) return 0;
     assert(thread_count > 0);
-    tu_u64 group_id = dfg->groups.size();
-    dfg->groups.emplace_back();
-    TU_DfgWorkerGroup *group = &dfg->groups.back();
+    TU_DfgWorkerGroup *group = new TU_DfgWorkerGroup();
+    group->id = dfg->groups.size();
     group->dfg = dfg;
-    group->id = group_id;
     group->workers = std::vector<TU_DfgWorker>(thread_count);
     size_t worker_id = 0;
     for (auto &worker : group->workers) {
         worker.group = group;
         worker.id = worker_id++;
     }
-    return group_id;
+    dfg->groups.push_back(group);
+    return group->id;
 }
 
-void tu_dfg_exec(TU_Dfg *dfg, TU_Graph *graph) {
+void tu_dfg_clear(TU_Dfg *dfg) {
+    if (dfg->graph == nullptr) return;
+    tu_dfg_term(dfg);
+    for (auto group : dfg->groups) {
+        group->nodes.clear(); // we do this here because group_register_nodes is recursive
+    }
+}
+
+static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
+    for (TU_GraphNode *node : graph->nodes) {
+        if (node->b_exec != nullptr) {
+            if (node->b_exec->group >= dfg->groups.size()) {
+                printf("[TU_ERROR]: cannot register node `%s' group `%ld' in dfg.\n",
+                       node->name, node->b_exec->group);
+                return;
+            }
+            printf("register node %s in group %ld\n", node->name, node->b_exec->group);
+            dfg->groups[node->b_exec->group]->nodes.push_back(node);
+        } else if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+            dfg_register_nodes(dfg, node->sub_type.graph);
+        }
+    }
+}
+
+void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph) {
     if (!ptr_arg_check(dfg)) return;
     if (!ptr_arg_check(graph)) return;
+    if (dfg->graph != nullptr && dfg->graph != graph) {
+        printf("[TU_ERROR]: cannot execute graph `%s', dfg must be cleared before.\n",
+               graph->name);
+        return;
+    }
     dfg->graph = graph;
-    for (auto &group : dfg->groups) {
-        group.nodes.clear(); // we do this here because group_register_nodes is recursive
-        group_register_nodes(&group, dfg->graph);
-        for (auto &worker : group.workers) {
+    dfg_register_nodes(dfg, graph);
+}
+
+void tu_dfg_exec(TU_Dfg *dfg) {
+    if (!ptr_arg_check(dfg)) return;
+    if (dfg->graph == nullptr) {
+        printf("[TU_ERROR]: cannor execute dfg without a graph (call tu_dfg_set_graph first).\n");
+        return;
+    }
+    for (auto group : dfg->groups) {
+        for (auto &worker : group->workers) {
             worker_start(&worker);
         }
     }
@@ -46,16 +81,15 @@ void tu_dfg_exec(TU_Dfg *dfg, TU_Graph *graph) {
 
 void tu_dfg_term(TU_Dfg *dfg) {
     assert(dfg->graph != nullptr);
-    for (auto &group : dfg->groups) {
-        for (auto &worker : group.workers) {
+    for (auto group : dfg->groups) {
+        for (auto &worker : group->workers) {
             worker.can_terminate.store(true);
         }
-        group.sem.release(group.workers.size());
-        for (auto &worker : group.workers) {
+        group->sem.release(group->workers.size());
+        for (auto &worker : group->workers) {
             worker_stop(&worker);
         }
     }
-    dfg->graph = nullptr;
 }
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
@@ -73,7 +107,8 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
     };
     for (auto input_node : dfg->graph->inputs[type]) {
         assert(input_node->b_exec != nullptr);
-        dfg_ctx.group = &dfg->groups[input_node->b_exec->group];
+        assert(input_node->b_exec->group < dfg->groups.size());
+        dfg_ctx.group = dfg->groups[input_node->b_exec->group];
         tu_internal_node_enqueue(&dfg_ctx, input_node, &data);
     }
 }
@@ -85,22 +120,10 @@ TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg) {
     return result;
 }
 
-// TODO: this should not be done this way
-static void group_register_nodes(TU_DfgWorkerGroup *group, TU_Graph *graph) {
-    assert(group != nullptr);
-    assert(graph != nullptr);
-    for (TU_GraphNode *node : graph->nodes) {
-        if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
-            group_register_nodes(group, node->sub_type.graph);
-        } else if (node->b_exec->group == group->id) {
-            printf("register %s in group %ld\n", node->name, group->id);
-            group->nodes.push_back(node);
-        }
-    }
-}
-
 static void worker_start(TU_DfgWorker *worker) {
     assert(worker != nullptr);
+    assert(worker->group != nullptr);
+    assert(worker->group->dfg != nullptr);
     worker->parked.store(true);
     worker->can_terminate.store(false);
     worker->thread = std::thread(worker_run, worker);

@@ -7,6 +7,7 @@
 #ifndef SRC_THREAD_UTILS_DFG_GRAPH
 #define SRC_THREAD_UTILS_DFG_GRAPH
 #include "decl.hpp"
+#include "profiling.hpp"
 
 enum TU_GraphNodeKind {
     TU_GRAPH_NODE_KIND_TASK,
@@ -29,17 +30,16 @@ struct TU_GraphExecNodeBase {
     TU_Map<TU_TypeId, TU_Set<TU_GraphNode *>> successors = {};
     TU_GraphSink *sink = nullptr;
     tu_u64 group = 0;
+    TU_GraphExecNodeBaseProfileInfos prof_infos;
 };
 
 struct TU_GraphTask {
-    TU_ProfQueueInfos prof_queue = {};
     void *data = nullptr;
 };
 
 struct TU_GraphState {
     alignas(CACHE_LINE) TU_Atomic<size_t> counter = 0;
     TU_GraphNodeQueue protected_queue = {};
-    TU_ProfQueueInfos prof_queue = {};
     void *data = nullptr;
 };
 

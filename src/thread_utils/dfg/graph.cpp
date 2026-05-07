@@ -383,6 +383,9 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     TU_GraphNode *node = exec_ctx->node;
     TU_GraphData data{ptr, type};
     bool result_sinked = false;
+    TU_Stopwatch sw;
+
+    tu_internal_result_start(node->b_exec, &sw);
 
     // when we need to add a global result, we add the data to the graph result
     // queue and we use the `result_sinked` flag to avoid generating a warning
@@ -397,6 +400,8 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
         if (!result_sinked) {
             printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
                    type, node->name);
+        } else {
+            tu_internal_result_end(node->b_exec, &sw);
         }
         return;
     }
@@ -404,6 +409,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     for (TU_GraphNode *successor : node->b_exec->successors[type]) {
         tu_internal_node_enqueue(&exec_ctx->dfg_ctx, successor, &data);
     }
+    tu_internal_result_end(node->b_exec, &sw);
 }
 
 void *tu_node_data(TU_ExecContext *exec_ctx) {

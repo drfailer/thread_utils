@@ -1,10 +1,73 @@
 #include "profiling.hpp"
 #include "log.hpp"
+#include "graph.hpp"
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <set>
 
+/******************************************************************************/
+/*                          exec base profile helper                          */
+/******************************************************************************/
+
+void tu_internal_exec_start(TU_GraphExecNodeBase *, TU_Stopwatch *sw) {
+    tu_stopwatch_start(sw);
+}
+
+void tu_internal_exec_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw) {
+    b_exec->prof_infos.exec_count += 1;
+    b_exec->prof_infos.exec_dur += tu_stopwatch_stop_and_get_time(sw).count();
+}
+
+void tu_internal_result_start(TU_GraphExecNodeBase *, TU_Stopwatch *sw) {
+    tu_stopwatch_start(sw);
+}
+
+void tu_internal_result_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw) {
+    b_exec->prof_infos.result_count += 1;
+    b_exec->prof_infos.result_dur += tu_stopwatch_stop_and_get_time(sw).count();
+}
+
+/******************************************************************************/
+/*                             print to dot file                              */
+/******************************************************************************/
+
 #define ADDR(node) '"' << ((void*)node) << '"'
+
+/* TODO: display the profiling output into tables
+ * graphviz tables:
+table [shape=none, label=<
+    <table border="0" cellborder="1" cellspacing="0" cellpadding="5">
+        <tr><td colspan="2">title</td></tr>
+        <tr><td align="left" bgcolor="#ff0000">col1</td><td>col2</td></tr>
+        <tr><td>col1</td><td>col2</td></tr>
+        <tr><td>col1</td><td>col2</td></tr>
+    </table>
+>]
+ */
+
+static std::string get_exec_node_label(TU_GraphNode *node) {
+    assert(node->b_exec != nullptr);
+    std::ostringstream oss;
+    constexpr const char *sep = "\\n";
+
+    oss << node->name << sep;
+    for (auto &[type, queue] : node->b_exec->queues) {
+        if constexpr (requires { queue.prof(); }) {
+            oss << "queue[" << type << "]: " << queue.prof() << sep;
+        }
+    }
+    if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
+        auto const &queue = node->sub_type.state->protected_queue;
+        if constexpr (requires { queue.prof(); }) {
+            oss << "protected queue: " << queue.prof() << sep;
+        }
+    }
+    oss << node->b_exec->prof_infos.prof_str();
+    // TODO: I also want to profile the map acces times
+    // TODO: We need the lock time for the state
+    return oss.str();
+}
 
 static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t level) {
     if (!ptr_arg_check(graph)) return;
@@ -39,7 +102,7 @@ static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t l
         switch (node->kind) {
         case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
         case TU_GRAPH_NODE_KIND_STATE: {
-            fs << ADDR(node) << " [label=\"" << node->name << "\",shape=rect];" << std::endl;
+            fs << ADDR(node) << " [label=\"" << get_exec_node_label(node) << "\",shape=rect];" << std::endl;
             for (auto [type, successors] : node->b_exec->successors) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;

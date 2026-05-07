@@ -77,7 +77,6 @@ void product_state_exec_tile_a(TU_ExecContext *ctx, void *rawdata, tu_i64 type) 
     auto task_data = (ProductStateData*)tu_node_data(ctx);
     assert(type == T_TileA);
     auto tile = (MatrixTile*)rawdata;
-    auto matrix_kind = (MatrixKind)type;
     size_t TM = task_data->TM, TN = task_data->TN, TK = task_data->TK;
 
     assert(task_data->A_tiles[tile->row * TK + tile->col] == nullptr);
@@ -97,7 +96,6 @@ void product_state_exec_tile_b(TU_ExecContext *ctx, void *rawdata, tu_i64 type) 
     auto task_data = (ProductStateData*)tu_node_data(ctx);
     assert(type == T_TileB);
     auto tile = (MatrixTile*)rawdata;
-    auto matrix_kind = (MatrixKind)type;
     size_t TM = task_data->TM, TN = task_data->TN, TK = task_data->TK;
 
     assert(task_data->B_tiles[tile->row * TN + tile->col] == nullptr);
@@ -117,7 +115,6 @@ void sum_state_exec_tile_c(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
     auto task_data = (SumStateData*)tu_node_data(ctx);
     assert(type == T_TileC);
     auto tile = (MatrixTile*)rawdata;
-    auto matrix_kind = (MatrixKind)type;
     size_t TN = task_data->TN;
     size_t c_idx = tile->row * TN + tile->col;
 
@@ -135,7 +132,6 @@ void sum_state_exec_tile_p(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
     auto task_data = (SumStateData*)tu_node_data(ctx);
     assert(type == T_TileP);
     auto tile = (MatrixTile*)rawdata;
-    auto matrix_kind = (MatrixKind)type;
     size_t TN = task_data->TN;
     size_t c_idx = tile->row * TN + tile->col;
 

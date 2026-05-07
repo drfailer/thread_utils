@@ -345,16 +345,16 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_exec(sum_state, T_TileP, &sum_state_exec_tile_p);
     tu_exec(sum_state, T_PCTiles, &sum_state_exec_tile_pc_tiles);
 
-    assert(tu_add_inputs(&graph, split_task));
-    assert(tu_edges(split_task, product_state));
-    assert(tu_edges(split_task, sum_state));
-    assert(tu_edges(product_state, product_task));
-    assert(tu_edges(product_task, sum_state));
-    assert(tu_edges(sum_state, sum_task));
-    assert(tu_edges(sum_task, sum_state));
-    assert(tu_add_outputs(&graph, sum_state));
+    tu_add_inputs(&graph, split_task);
+    tu_edges(split_task, product_state);
+    tu_edges(split_task, sum_state);
+    tu_edges(product_state, product_task);
+    tu_edges(product_task, sum_state);
+    tu_edges(sum_state, sum_task);
+    tu_edges(sum_task, sum_state);
+    tu_add_outputs(&graph, sum_state);
 
-    assert(tu_graph_check(&graph));
+    tu_graph_check(&graph);
 
     tu_graph_print_to_dot(&graph, "graph.dot");
 

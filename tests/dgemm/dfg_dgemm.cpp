@@ -158,6 +158,7 @@ void sum_state_exec_tile_pc_tiles(TU_ExecContext *ctx, void *rawdata, tu_i64 typ
     delete tiles;
     task_data->count -= 1;
     if (task_data->count == 0) {
+        printf("result\n");
         tu_result(ctx, c, T_TileC);
         return;
     }

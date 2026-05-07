@@ -9,7 +9,8 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M = 1024, N = 1024, K = 1024, TILE_SIZE = 256;
+constexpr size_t M_SIZE = 64;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 32;
 // #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -275,8 +276,8 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     defer(tu_dfg_destroy(&dfg));
 
     tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3);
-    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 4);
-    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 1);
+    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40);
+    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10);
     tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1);
     tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1);
 

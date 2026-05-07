@@ -64,19 +64,19 @@ void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {// {{{
     // tu_u64 product_task_group = tu_tm_add_thread_group(&tm, 40);
     // tu_u64 sum_task_group = tu_tm_add_thread_group(&tm, 10);
 
-    tu_u64 task_group = tu_tm_add_thread_group(&tm, 40);
-    tu_u64 sum_state_group = tu_tm_add_thread_group(&tm, 1);
-    tu_u64 product_state_group =  tu_tm_add_thread_group(&tm, 1);
-    tu_u64 split_task_group = task_group;
-    tu_u64 product_task_group = task_group;
-    tu_u64 sum_task_group = task_group;
+    // tu_u64 task_group = tu_tm_add_thread_group(&tm, 40);
+    // tu_u64 sum_state_group = tu_tm_add_thread_group(&tm, 1);
+    // tu_u64 product_state_group =  tu_tm_add_thread_group(&tm, 1);
+    // tu_u64 split_task_group = task_group;
+    // tu_u64 product_task_group = task_group;
+    // tu_u64 sum_task_group = task_group;
 
-    // tu_u64 unique_group = tu_tm_add_thread_group(&tm, 40);
-    // tu_u64 sum_state_group = unique_group;
-    // tu_u64 product_state_group = unique_group;
-    // tu_u64 split_task_group = unique_group;
-    // tu_u64 product_task_group = unique_group;
-    // tu_u64 sum_task_group = unique_group;
+    tu_u64 unique_group = tu_tm_add_thread_group(&tm, 40);
+    tu_u64 sum_state_group = unique_group;
+    tu_u64 product_state_group = unique_group;
+    tu_u64 split_task_group = unique_group;
+    tu_u64 product_task_group = unique_group;
+    tu_u64 sum_task_group = unique_group;
 
     tu_tm_start(&tm);
 
@@ -275,18 +275,18 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
 
-    tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3);
-    tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40);
-    tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10);
-    tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1);
-    tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1);
+    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0);
+    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0);
+    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0);
+    // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
+    // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
 
-    // tu_u64 group = tu_dfg_add_worker_group(&dfg, 4);
-    // tu_u64 split_group = group;
-    // tu_u64 product_group = group;
-    // tu_u64 sum_group = group;
-    // tu_u64 product_state_group = group;
-    // tu_u64 sum_state_group = group;
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 16);
+    tu_u64 split_group = group;
+    tu_u64 product_group = group;
+    tu_u64 sum_group = group;
+    tu_u64 product_state_group = group;
+    tu_u64 sum_state_group = group;
 
 
     printf("create dfg graph...\n");

@@ -12,7 +12,7 @@ TU_Dfg tu_dfg_create() {
 
 void tu_dfg_destroy(TU_Dfg *) {}
 
-tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count) {
+tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t cache_size) {
     if (!ptr_arg_check(dfg)) return 0;
     assert(thread_count > 0);
     TU_DfgWorkerGroup *group = new TU_DfgWorkerGroup();
@@ -23,6 +23,9 @@ tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count) {
     for (auto &worker : group->workers) {
         worker.group = group;
         worker.id = worker_id++;
+        if (cache_size > 0) {
+            worker.cache = TU_CacheQueue<TU_GraphOperation>(cache_size);
+        }
     }
     dfg->groups.push_back(group);
     return group->id;

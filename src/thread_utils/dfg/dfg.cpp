@@ -193,6 +193,12 @@ static void worker_process_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_Gr
     }
 }
 
+static void worker_process_cache(TU_DfgWorker *worker) {
+    for (TU_GraphOperation op = {}; worker->cache.pop(&op);) {
+        worker_node_exec(worker, op.node, &op.data);
+    }
+}
+
 static void worker_process_queues(TU_DfgWorker *worker) {
     // TODO: compute the start and end position based on the worker id
     size_t start_node_idx = 0;
@@ -209,7 +215,7 @@ static void worker_process_queues(TU_DfgWorker *worker) {
         } else {
             worker_node_exec(worker, node, &data);
         }
-        // TODO: process the cache
+        worker_process_cache(worker);
         // TODO: if the worker is on its region, continue dequeuing, otherwise reset the loop
     }
 }

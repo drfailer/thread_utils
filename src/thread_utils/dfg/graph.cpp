@@ -374,8 +374,27 @@ static void tu_internal_node_notify_result(TU_DfgContext *dfg_ctx) {
     dfg_ctx->dfg->cond.notify_all();
 }
 
+static bool tu_internal_node_cache_data(TU_DfgContext *dfg_ctx, TU_GraphNode *node,
+                                        TU_GraphNode *successor, TU_GraphData *data) {
+    assert(successor->b_exec != nullptr);
+    if (successor->kind == TU_GRAPH_NODE_KIND_STATE) return false;
+    if (successor->b_exec->group != node->b_exec->group) return false;
+
+    TU_DfgWorker *worker = dfg_ctx->worker;
+    assert(worker != nullptr);
+    TU_GraphOperation op{*data, successor};
+    TU_GraphOperation poped_op;
+
+    // since the cache has a limited size (to avoid unbalanced workload), a
+    // newly cached value may replaced an old one that must be queued to the
+    // proper queue.
+    if (worker->cache.cache(op, &poped_op)) {
+        tu_internal_node_enqueue(dfg_ctx, poped_op.node, &poped_op.data);
+    }
+    return true;
+}
+
 // FIXME: this function should be defined elsewhere
-// TODO(CACHE): bool tu_internal_worker_cache(worker, &graph_data);
 void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     if (!ptr_arg_check(exec_ctx)) return;
     if (!ptr_arg_check(ptr)) return;
@@ -405,9 +424,10 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
         }
         return;
     }
-    // TODO(CACHE): try to use the worker cache
     for (TU_GraphNode *successor : node->b_exec->successors[type]) {
-        tu_internal_node_enqueue(&exec_ctx->dfg_ctx, successor, &data);
+        if (!tu_internal_node_cache_data(&exec_ctx->dfg_ctx, node, successor, &data)) {
+            tu_internal_node_enqueue(&exec_ctx->dfg_ctx, successor, &data);
+        }
     }
     tu_internal_result_end(node->b_exec, &sw);
 }

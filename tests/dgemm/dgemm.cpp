@@ -9,7 +9,7 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M = 16, N = 16, K = 16, TILE_SIZE = 4;
+constexpr size_t M = 1024, N = 1024, K = 1024, TILE_SIZE = 256;
 // #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -270,6 +270,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     size_t TN = C.cols / TILE_SIZE + (C.cols % TILE_SIZE == 0 ? 0 : 1);
     size_t TK = A.cols / TILE_SIZE + (A.cols % TILE_SIZE == 0 ? 0 : 1);
 
+    timer_start(dgemm_dfg);
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
     tu_u64 group = tu_dfg_add_worker_group(&dfg, 40);
@@ -351,6 +352,15 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_dfg_wait_result(&dfg); // only one result before termination
     printf("stop dfg...\n");
     tu_dfg_term(&dfg);
+    timer_end(dgemm_dfg);
+
+    timer_report(dgemm_dfg);
+    matrix_print(C);
+    if (!matrix_test_equal(C, E)) {
+        printf("dgemm_dfg(%ld, %ld, %ld, %ld) failed.\n", M, N, K, TILE_SIZE);
+        return;
+    }
+    printf("dgemm_dfg(%ld, %ld, %ld, %ld) success.\n", M, N, K, TILE_SIZE);
 }
 
 #ifdef DGEMM_HH

@@ -89,8 +89,6 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver);
 void tu_result(TU_ExecContext *exec_ctx, void *data, TU_TypeId type);
 void *tu_node_data(TU_ExecContext *exec_ctx);
 
-void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
-
 void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_GraphData *data);
 bool tu_internal_node_dequeue(TU_GraphNode *node, TU_GraphData *data);
 

@@ -18,13 +18,14 @@ struct TU_GraphExecNodeBaseProfileInfos {
 
     std::string prof_str() {
         std::ostringstream oss;
-        constexpr const char *sep = "\\n";
         std::string exec_avg = tu_duration_to_string(TU_Duration(exec_dur.load() / exec_count.load()));
         std::string exec_ttl = tu_duration_to_string(TU_Duration(exec_dur));
         std::string result_avg = tu_duration_to_string(TU_Duration(result_dur.load() / result_count.load()));
         std::string result_ttl = tu_duration_to_string(TU_Duration(result_dur));
-        oss << "exec: avg = " << exec_avg << ", ttl = " << exec_ttl << " (count = " << exec_count.load() << ")." << sep;
-        oss << "result: avg = " << result_avg << ", ttl = " << result_ttl << " (count = " << result_count.load() << ").";
+        oss << "<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"5\">\n";
+        oss << "<tr><td>exec:</td><td>" << exec_avg << " / " << exec_ttl << "</td><td>" << exec_count.load() << "</td></tr>\n";
+        oss << "<tr><td>result:</td><td>" << result_avg << " / " << result_ttl << "</td><td>" << result_count.load() << "</td></tr>\n";
+        oss << "</table>\n";
         return oss.str();
     }
 };
@@ -35,17 +36,17 @@ void tu_internal_result_start(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
 void tu_internal_result_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
 
 struct TU_DfgWorkerProfileInfos {
-    // TODO: process time
     TU_Map<TU_GraphNode *, std::pair<TU_Duration, size_t>> exec_dur = {};
-    size_t process_count = 0;
     size_t work_count = 0;
     TU_Duration work_time = {};
+    TU_Duration sleep_time = {};
 };
 
-struct TU_DfgWorkerGroupProfileInfos {
-    // TODO: ?
+struct TU_DfgProfileInfos {
+    TU_Duration creation_time;
+    TU_Duration execution_time;
 };
 
-void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
+void tu_graph_print_to_dot(TU_Dfg *dfg, const char *filename);
 
 #endif

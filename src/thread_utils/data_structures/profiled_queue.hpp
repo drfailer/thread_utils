@@ -63,7 +63,6 @@ bool TU_ProfiledQueue<Q>::pop(auto *result) {
 
 template <typename Q>
 std::string TU_ProfiledQueue<Q>::prof_str() const {
-    static constexpr const char *sep = "\\n";
     std::ostringstream oss;
     // enqueue
     size_t count = push_count.load();
@@ -72,11 +71,13 @@ std::string TU_ProfiledQueue<Q>::prof_str() const {
     // dequeue
     std::string pop_dur_ttl = tu_duration_to_string(TU_Duration(pop_dur.load()));
     std::string pop_dur_avg = tu_duration_to_string(TU_Duration(pop_dur.load() / count));
-    oss << "QS = " << qs.load() << "\\n"
-        << "MQS = " << mqs.load() << "\\n"
-        << "push: avg = " << push_dur_avg << ", ttl = " << push_dur_ttl << sep
-        << "pop: avg = " << pop_dur_avg << ", ttl = " << pop_dur_ttl << sep
-        << "count = " << count;
+    oss << "<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"5\">\n";
+    oss << "<tr><td>QS:</td><td>" << qs.load() << "</td></tr>\n";
+    oss << "<tr><td>MQS:</td><td>" << mqs.load() << "</td></tr>\n";
+    oss << "<tr><td>push:</td><td>" << push_dur_avg << " / " << push_dur_ttl << "</td></tr>\n";
+    oss << "<tr><td>pop:</td><td>" << pop_dur_avg << " / " << pop_dur_ttl << "</td></tr>\n";
+    oss << "<tr><td>elts:</td><td>" << count << "</td></tr>\n";
+    oss << "</table>\n";
     return oss.str();
 }
 

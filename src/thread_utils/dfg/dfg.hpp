@@ -16,6 +16,7 @@ struct TU_DfgWorker {
     tu_u64 id = 0;
     // TODO: the cache size should be configurable (maybe through the add group function)
     TU_CacheQueue<TU_GraphOperation> cache = {};
+    TU_DfgWorkerProfileInfos prof_infos = {};
     alignas(CACHE_LINE) TU_AtomicFlag parked = true;
     alignas(CACHE_LINE) TU_AtomicFlag can_terminate = false;
 
@@ -24,7 +25,8 @@ struct TU_DfgWorker {
     TU_DfgWorker(TU_DfgWorker const &) = delete;
     TU_DfgWorker(TU_DfgWorker &&other)
         : thread(std::move(other.thread)), group(other.group), id(other.id),
-          cache(std::move(other.cache)), parked(other.parked.load()),
+          cache(std::move(other.cache)), prof_infos(other.prof_infos),
+          parked(other.parked.load()),
           can_terminate(other.can_terminate.load()) {}
 };
 
@@ -42,11 +44,15 @@ struct TU_Dfg {
     TU_Cond cond;
     TU_Array<TU_DfgWorkerGroup *> groups = {};
     TU_Graph *graph = nullptr;
+    TU_DfgProfileInfos prof_infos = {};
+    TU_Stopwatch sw;
 
     // constructors
     TU_Dfg() = default;
     TU_Dfg(TU_Dfg const &) = delete;
-    TU_Dfg(TU_Dfg &&other) : groups(std::move(other.groups)), graph(other.graph) {}
+    TU_Dfg(TU_Dfg &&other)
+        : groups(std::move(other.groups)), graph(other.graph),
+          prof_infos(std::move(other.prof_infos)) {}
     ~TU_Dfg() {
         for (auto group : groups) {
             delete group;

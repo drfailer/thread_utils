@@ -10,7 +10,12 @@ TU_Dfg tu_dfg_create() {
     return dfg;
 }
 
-void tu_dfg_destroy(TU_Dfg *) {}
+void tu_dfg_destroy(TU_Dfg *dfg) {
+    for (auto group : dfg->groups) {
+        delete group;
+    }
+    dfg->groups.clear();
+}
 
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t cache_size) {
     if (!ptr_arg_check(dfg)) return 0;
@@ -47,7 +52,11 @@ static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
                        node->name, node->b_exec->group);
                 return;
             }
-            dfg->groups[node->b_exec->group]->nodes.push_back(node);
+            auto group = dfg->groups[node->b_exec->group];
+            group->nodes.push_back(node);
+            for (auto &worker : group->workers) {
+                worker.prof_infos.exec_dur[node] = {};
+            }
         } else if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
             dfg_register_nodes(dfg, node->sub_type.graph);
         }
@@ -62,6 +71,7 @@ void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph) {
                graph->name);
         return;
     }
+    dfg->sw = tu_stopwatch_start_new();
     dfg->graph = graph;
     dfg_register_nodes(dfg, graph);
 }
@@ -77,6 +87,8 @@ void tu_dfg_exec(TU_Dfg *dfg) {
             worker_start(&worker);
         }
     }
+    dfg->prof_infos.creation_time = tu_stopwatch_stop_and_get_time(&dfg->sw);
+    dfg->sw = tu_stopwatch_start_new();
 }
 
 void tu_dfg_term(TU_Dfg *dfg) {
@@ -90,6 +102,7 @@ void tu_dfg_term(TU_Dfg *dfg) {
             worker_stop(&worker);
         }
     }
+    dfg->prof_infos.execution_time = tu_stopwatch_stop_and_get_time(&dfg->sw);
 }
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
@@ -155,6 +168,10 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     assert(exec_it != node->b_exec->execs.end());
     exec_it->second(&exec_ctx, data->data, data->type);
     tu_internal_exec_end(node->b_exec, &sw);
+    // worker profiling
+    auto &prof = worker->prof_infos.exec_dur[node];
+    prof.first += tu_stopwatch_get_time(&sw);
+    prof.second += 1;
 }
 
 static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
@@ -267,12 +284,17 @@ static void worker_run(TU_DfgWorker *worker) {
     assert(worker->group != nullptr);
     assert(worker->group->dfg != nullptr);
     for (;;) {
+        TU_Stopwatch sw = tu_stopwatch_start_new();
         worker->parked.store(true);
         worker->group->sem.acquire();
+        worker->prof_infos.sleep_time += tu_stopwatch_stop_and_get_time(&sw);
         if (worker->can_terminate.load()) {
             break;
         }
+        tu_stopwatch_start(&sw);
         worker->parked.store(false);
         worker_process_queues(worker);
+        worker->prof_infos.work_time += tu_stopwatch_stop_and_get_time(&sw);
+        worker->prof_infos.work_count += 1;
     }
 }

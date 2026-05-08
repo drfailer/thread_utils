@@ -366,10 +366,10 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     printf("stop dfg...\n");
     tu_dfg_term(&dfg);
     timer_end(dgemm_dfg);
-
-    tu_graph_print_to_dot(&graph, "graph.dot");
-
     timer_report(dgemm_dfg);
+
+    tu_graph_print_to_dot(&dfg, "graph.dot");
+
     matrix_print(C);
     if (!matrix_test_equal(C, E)) {
         printf("dgemm_dfg(%ld, %ld, %ld, %ld) failed.\n", M, N, K, TILE_SIZE);

@@ -32,6 +32,10 @@ using TU_Array = std::vector<T>;
 template <typename T>
 using TU_Set = std::set<T>;
 
+// TODO: since the map is mostly used with the type as a key, and the number of
+// type should be low, it might be better to use a custom map based on a sorted
+// vector (insertion are only done at the initialization so it won't be an
+// issue)
 template <typename K, typename V>
 using TU_Map = std::map<K, V>;
 

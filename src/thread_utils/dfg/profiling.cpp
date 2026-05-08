@@ -47,20 +47,20 @@ table [shape=none, label=<
  */
 
 static std::string get_exec_node_label(TU_GraphNode *node) {
+    static constexpr const char *sep = "\\n";
     assert(node->b_exec != nullptr);
     std::ostringstream oss;
-    constexpr const char *sep = "\\n";
 
     oss << node->name << sep;
     for (auto &[type, queue] : node->b_exec->queues) {
-        if constexpr (requires { queue.prof(); }) {
-            oss << "queue[" << type << "]: " << queue.prof() << sep;
+        if constexpr (requires { queue.prof_str(); }) {
+            oss << "queue[" << type << "]: " << queue.prof_str() << sep;
         }
     }
     if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
         auto const &queue = node->sub_type.state->protected_queue;
-        if constexpr (requires { queue.prof(); }) {
-            oss << "protected queue: " << queue.prof() << sep;
+        if constexpr (requires { queue.prof_str(); }) {
+            oss << "protected queue: " << queue.prof_str() << sep;
         }
     }
     oss << node->b_exec->prof_infos.prof_str();
@@ -69,11 +69,16 @@ static std::string get_exec_node_label(TU_GraphNode *node) {
     return oss.str();
 }
 
+// TODO: it would be nice to also have the profiling infos displayed in a global table.
+//       The table should also contain additional information like the max
+//       cache size and the process time for the workers (all the runner
+//       information)
 static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t level) {
     if (!ptr_arg_check(graph)) return;
     if (level == 0) {
         fs << "digraph " << ADDR(graph) << "{" << std::endl;
         // source
+        // TODO: execution and creation times
         fs << "source [label=\"\",width=.1,shape=circle];" << std::endl;
         for (auto [type, inputs] : graph->inputs) {
             std::string edge = "source" + std::to_string(type);
@@ -103,7 +108,7 @@ static void graph_print_to_dot_impl(TU_Graph *graph, std::ofstream &fs, size_t l
         case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
         case TU_GRAPH_NODE_KIND_STATE: {
             fs << ADDR(node) << " [label=\"" << get_exec_node_label(node) << "\",shape=rect];" << std::endl;
-            for (auto [type, successors] : node->b_exec->successors) {
+            for (auto &[type, successors] : node->b_exec->successors) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
                 fs << ADDR(node) << " -> " << edge << ";" << std::endl;

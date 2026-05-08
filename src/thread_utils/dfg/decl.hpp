@@ -1,10 +1,7 @@
 #ifndef THREAD_UTILS_DFG_TYPES
 #define THREAD_UTILS_DFG_TYPES
 #include "../common.hpp"
-#include "../data_structures/lock_free_queue.hpp"
-#include "../data_structures/lock_queue.hpp"
-#include "../data_structures/finite_overflow_queue.hpp"
-#include "../data_structures/cache_queue.hpp"
+#include "../data_structures/queue.hpp"
 #include "../tools/profiling.hpp"
 
 struct TU_Graph;

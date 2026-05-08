@@ -141,7 +141,6 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     assert(node != nullptr);
     assert(data != nullptr);
     assert(node->b_exec != nullptr);
-    assert(node->b_exec->execs.contains(data->type));
     TU_Stopwatch sw;
     TU_ExecContext exec_ctx = {
         .node = node,
@@ -152,7 +151,9 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
         },
     };
     tu_internal_exec_start(node->b_exec, &sw);
-    node->b_exec->execs[data->type](&exec_ctx, data->data, data->type);
+    auto [exec, ok] = node->b_exec->execs[data->type];
+    assert(ok);
+    (*exec)(&exec_ctx, data->data, data->type);
     tu_internal_exec_end(node->b_exec, &sw);
 }
 

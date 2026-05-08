@@ -6,6 +6,10 @@
 #include <string>
 #include <sstream>
 
+struct TU_GraphProfileInfo {
+    // TODO: global timer
+};
+
 struct TU_GraphExecNodeBaseProfileInfos {
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_count;
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_dur;
@@ -29,6 +33,18 @@ void tu_internal_exec_start(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
 void tu_internal_exec_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
 void tu_internal_result_start(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
 void tu_internal_result_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
+
+struct TU_DfgWorkerProfileInfos {
+    // TODO: process time
+    TU_Map<TU_GraphNode *, std::pair<TU_Duration, size_t>> exec_dur = {};
+    size_t process_count = 0;
+    size_t work_count = 0;
+    TU_Duration work_time = {};
+};
+
+struct TU_DfgWorkerGroupProfileInfos {
+    // TODO: ?
+};
 
 void tu_graph_print_to_dot(TU_Graph *graph, const char *filename);
 

@@ -40,12 +40,22 @@ struct TU_FiniteLockFreeQueue {
     TU_RingBuffer<TU_FiniteLockFreeQueueNode<T>, SIZE> buffer;
     alignas(CACHE_LINE) TU_Atomic<size_t> head{0};
     alignas(CACHE_LINE) TU_Atomic<size_t> tail{0};
-    TU_FiniteLockFreeQueue();
-    TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue<T, SIZE> const &) = delete;
-    TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue<T, SIZE> &&other)
-        : buffer(std::move(other.buffer)), head(other.head.load()), tail(other.tail.load()) {}
+
     bool push(T value);
     bool pop(T *result);
+
+    TU_FiniteLockFreeQueue();
+    TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue<T, SIZE> const &) = delete;
+    TU_FiniteLockFreeQueue<T, SIZE> &operator=(TU_FiniteLockFreeQueue<T, SIZE> const &) = delete;
+    TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue<T, SIZE> &&other)
+        : buffer(std::move(other.buffer)), head(other.head.load()), tail(other.tail.load()) {}
+    TU_FiniteLockFreeQueue<T, SIZE> &operator=(TU_FiniteLockFreeQueue<T, SIZE> &&other) {
+        this->buffer = std::move(other.buffer);
+        this->head.store(other.head.load());
+        this->tail.store(other.tail.load());
+        return *this;
+    }
+    ~TU_FiniteLockFreeQueue() = default;
 };
 
 template <typename T, size_t SIZE>
@@ -102,59 +112,5 @@ bool TU_FiniteLockFreeQueue<T, SIZE>::pop(T *result) {
     node->sequence.store(h + SIZE, std::memory_order_release);
     return true;
 }
-
-
-// BUG: this was my first design which doesn't work but I couldn't find out why
-// template <typename T, size_t SIZE = 1024>
-// struct TU_FiniteLockFreeQueue {
-//     alignas(CACHE_LINE) TU_Atomic<size_t> head = 0;
-//     alignas(CACHE_LINE) TU_Atomic<size_t> tail = 0;
-//     alignas(CACHE_LINE) TU_Atomic<size_t> write = 0;
-//     TU_RingBuffer<T, SIZE> buffer;
-//     bool push(T value);
-//     bool pop(T *result);
-//     TU_FiniteLockFreeQueue() = default;
-//     TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue const &) = delete;
-//     TU_FiniteLockFreeQueue(TU_FiniteLockFreeQueue &&other)
-//         : head(other.head.load()), tail(other.tail.load()),
-//           write(other.write.load()), buffer(std::move(other.buffer)) {}
-// };
-//
-// template <typename T, size_t SIZE>
-// bool TU_FiniteLockFreeQueue<T, SIZE>::push(T value) {
-//     size_t w = this->write.load(std::memory_order_relaxed);
-//
-//     // try to reserve a slot without "drifting" the counter
-//     do {
-//         size_t h = this->head.load(std::memory_order_acquire);
-//         if ((w - h) >= SIZE) {
-//             return false; // the queue is full
-//         }
-//     } while (!this->write.compare_exchange_weak(w, w + 1, std::memory_order_release));
-//
-//     // write the data
-//     this->buffer[w] = std::move(value);
-//
-//     size_t expected = w;
-//     while (!this->tail.compare_exchange_weak(expected, w + 1, std::memory_order_release)) {
-//         expected = w; // reset expected to our reserved slot
-//         cross_platform_yield();
-//     }
-//     return true;
-// }
-//
-// template <typename T, size_t SIZE>
-// bool TU_FiniteLockFreeQueue<T, SIZE>::pop(T *result) {
-//     size_t h = this->head.load(std::memory_order_relaxed);
-//
-//     do {
-//         size_t t = this->tail.load(std::memory_order_acquire);
-//         if (h >= t) {
-//             return false; // the queue is empty
-//         }
-//     } while (!this->head.compare_exchange_weak(h, h + 1, std::memory_order_release));
-//     *result = this->buffer[h];
-//     return true;
-// }
 
 #endif

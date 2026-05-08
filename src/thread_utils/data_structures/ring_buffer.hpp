@@ -7,14 +7,20 @@ struct TU_RingBuffer {
     static_assert((SIZE & (SIZE - 1)) == 0, "SIZE must be a power of 2.");
     static constexpr size_t MASK = SIZE - 1;
     T buffer[SIZE];
+
     T &operator[](size_t idx) { return buffer[idx & MASK]; }
+
     TU_RingBuffer() = default;
     TU_RingBuffer(TU_RingBuffer<T, SIZE> const &) = delete;
-    TU_RingBuffer(TU_RingBuffer<T, SIZE> &&other) {
+    TU_RingBuffer<T, SIZE> &operator=(TU_RingBuffer<T, SIZE> const &) = delete;
+    TU_RingBuffer(TU_RingBuffer<T, SIZE> &&other) { this->operator=(std::move(other)); }
+    TU_RingBuffer<T, SIZE> &operator=(TU_RingBuffer<T, SIZE> &&other) {
         for (size_t i = 0; i < SIZE; ++i) {
             this->buffer[i] = std::move(other.buffer[i]);
         }
+        return *this;
     }
+    ~TU_RingBuffer() = default;
 };
 
 #endif

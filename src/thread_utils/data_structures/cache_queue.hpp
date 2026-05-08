@@ -23,15 +23,18 @@ struct TU_CacheQueue {
     size_t tail = 0;
     size_t mask = 0;
     T *data = nullptr;
-    TU_CacheQueue() = default;
-    TU_CacheQueue(size_t size);
-    TU_CacheQueue(TU_CacheQueue<T> const &other) = delete;
-    TU_CacheQueue(TU_CacheQueue<T> &&other);
-    TU_CacheQueue<T> &operator=(TU_CacheQueue<T> &&other);
-    ~TU_CacheQueue();
+
     bool cache(T new_value, T *poped_value);
     bool pop(T *result);
     size_t count() const;
+
+    TU_CacheQueue() = default;
+    TU_CacheQueue(size_t size);
+    TU_CacheQueue(TU_CacheQueue<T> const &other) = delete;
+    TU_CacheQueue<T> &operator=(TU_CacheQueue<T> const &other) = delete;
+    TU_CacheQueue(TU_CacheQueue<T> &&other);
+    TU_CacheQueue<T> &operator=(TU_CacheQueue<T> &&other);
+    ~TU_CacheQueue();
 };
 
 template <typename T>

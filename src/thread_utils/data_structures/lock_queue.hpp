@@ -7,15 +7,28 @@ template <typename T>
 struct TU_LockQueue {
     TU_Mutex mutex;
     std::queue<T> data;
+
     void push(T value);
     bool pop(T *result);
+
     TU_LockQueue() = default;
+    TU_LockQueue(TU_LockQueue const &other) = delete;
+    TU_LockQueue<T> &operator=(TU_LockQueue const &other) = delete;
     TU_LockQueue(TU_LockQueue &&other);
+    TU_LockQueue<T> &operator=(TU_LockQueue &&other);
+    ~TU_LockQueue() = default;
 };
 
 template <typename T>
 TU_LockQueue<T>::TU_LockQueue(TU_LockQueue &&other)
     : data(std::move(other.data)) {}
+
+template <typename T>
+TU_LockQueue<T> &TU_LockQueue<T>::operator=(TU_LockQueue &&other) {
+    this->datas = std::move(other.data);
+    return *this;
+}
+
 
 template <typename T>
 void TU_LockQueue<T>::push(T value) {

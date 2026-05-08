@@ -55,22 +55,6 @@ TU_Duration tu_stopwatch_stop_and_get_time(TU_Stopwatch *sw) {
     return std::chrono::duration_cast<TU_Duration>(sw->end - sw->begin);
 }
 
-std::string tu_internal_prof_infos_to_string(TU_ProfQueueInfos const &infos) {
-    std::ostringstream oss;
-    size_t push_count = infos.push_count.load();
-    std::string push_dur_ttl = tu_duration_to_string(TU_Duration(infos.push_dur.load()));
-    std::string push_dur_avg = tu_duration_to_string(TU_Duration(infos.push_dur.load() / push_count));
-    // dequeue
-    std::string pop_dur_ttl = tu_duration_to_string(TU_Duration(infos.pop_dur.load()));
-    std::string pop_dur_avg = tu_duration_to_string(TU_Duration(infos.pop_dur.load() / push_count));
-    oss << "push: avg = " << push_dur_avg
-        << ", ttl = " << push_dur_ttl
-        << " | pop: avg = " << pop_dur_avg
-        << ", ttl = " << pop_dur_ttl
-        << " (count = " << push_count << ").";
-    return oss.str();
-}
-
 /******************************************************************************/
 /*                              queue profiling                               */
 /******************************************************************************/

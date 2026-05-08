@@ -46,12 +46,17 @@ struct TU_LockFreeQueue {
     #ifdef TU_LFQ_NODE_POOL
     alignas(CACHE_LINE) TU_Atomic<TU_LockFreeQueueNodePtr<T>> free_;
     #endif // TU_LFQ_NODE_POOL
-    TU_LockFreeQueue();
-    TU_LockFreeQueue(TU_LockFreeQueue<T> const &other) = delete;
-    TU_LockFreeQueue(TU_LockFreeQueue<T> &&other);
-    ~TU_LockFreeQueue();
+
     void push(T value);
     bool pop(T *result);
+
+    TU_LockFreeQueue();
+    TU_LockFreeQueue(TU_LockFreeQueue<T> const &other) = delete;
+    TU_LockFreeQueue<T> &operator=(TU_LockFreeQueue<T> const &other) = delete;
+    TU_LockFreeQueue(TU_LockFreeQueue<T> &&other);
+    TU_LockFreeQueue<T> &operator=(TU_LockFreeQueue<T> &&other);
+    ~TU_LockFreeQueue();
+
     private: TU_LockFreeQueueNode<T> *allocate_node();
     private: void release_node(TU_LockFreeQueueNode<T> *node);
 };
@@ -59,12 +64,19 @@ struct TU_LockFreeQueue {
 
 template <typename T>
 TU_LockFreeQueue<T>::TU_LockFreeQueue(TU_LockFreeQueue<T> &&other) {
+    this->operator=(std::move(other));
+}
+
+template <typename T>
+TU_LockFreeQueue<T> &TU_LockFreeQueue<T>::operator=(TU_LockFreeQueue<T> &&other) {
     // NOTE: we consider that other is only accessed by one thread.
     this->head_.store(other.head_);
     other.head_.store({});
     this->tail_.store(other.tail_);
     other.tail_.store({});
+    return *this;
 }
+
 
 template <typename T>
 TU_LockFreeQueue<T>::TU_LockFreeQueue() {

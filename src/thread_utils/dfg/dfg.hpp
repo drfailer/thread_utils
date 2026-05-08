@@ -14,6 +14,7 @@ struct TU_DfgWorker {
     TU_Thread thread;
     TU_DfgWorkerGroup *group = nullptr;
     tu_u64 id = 0;
+    tu_u64 process_count = 0;
     // TODO: the cache size should be configurable (maybe through the add group function)
     TU_CacheQueue<TU_GraphOperation> cache = {};
     TU_DfgWorkerProfileInfos prof_infos = {};
@@ -25,7 +26,9 @@ struct TU_DfgWorker {
     TU_DfgWorker(TU_DfgWorker const &) = delete;
     TU_DfgWorker(TU_DfgWorker &&other)
         : thread(std::move(other.thread)), group(other.group), id(other.id),
-          cache(std::move(other.cache)), prof_infos(other.prof_infos),
+          process_count(other.process_count),
+          cache(std::move(other.cache)),
+          prof_infos(other.prof_infos),
           parked(other.parked.load()),
           can_terminate(other.can_terminate.load()) {}
 };

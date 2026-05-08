@@ -172,6 +172,7 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     auto &prof = worker->prof_infos.exec_dur[node];
     prof.first += tu_stopwatch_get_time(&sw);
     prof.second += 1;
+    worker->process_count += 1;
 }
 
 static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
@@ -261,21 +262,63 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
 // TODO: we could count the number of workers on each node to try balancing the
 //       workload.
 static void worker_process_queues(TU_DfgWorker *worker) {
-    // TODO: compute the start and end position based on the worker id
-    size_t start_node_idx = 0;
-    size_t end_node_idx = worker->group->nodes.size();
-    for (size_t node_idx = start_node_idx; node_idx < end_node_idx;) {
-        TU_GraphNode *node = worker->group->nodes[node_idx];
+    size_t node_count = worker->group->nodes.size();
+    size_t worker_count = worker->group->workers.size();
+    size_t node_lb = 0;
+    size_t node_ub = 0;
+
+    if (node_count < worker_count) {
+        size_t worker_per_node = worker_count / node_count;
+        node_lb = worker->id / worker_per_node;
+        node_ub = node_lb + 1;
+    } else {
+        size_t node_per_worker = node_count / worker_count;
+        node_lb = node_count * worker->id;
+        node_ub = node_lb + node_per_worker;
+    }
+    assert(node_lb < node_count);
+
+    worker->process_count = 0;
+    size_t node_idx = 0;
+    for (;;) {
+        // when the node count is reach, we restart, unless all the queues are empty
+        if (node_idx >= node_count) {
+            if (worker->process_count == 0) {
+                return;
+            }
+            worker->process_count = 0;
+            node_idx = 0;
+        }
+
+        TU_GraphNode *node = worker->group->nodes[(node_idx + node_lb) % node_count];
         TU_GraphData data = {};
-        if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
-            worker_process_task_queue(worker, node);
-            node_idx += 1;
-        } else {
-            // TODO: this is dangerous
-            while (tu_internal_node_dequeue(node, &data)) {
-                worker_exec_state(worker, node, &data);
+        if (node_lb <= node_idx && node_idx < node_ub) {
+            // the worker is affected to the current node, therefore we process
+            // all the elements until the queue is empty
+            if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
+                worker_process_task_queue(worker, node);
+            } else {
+                // TODO: we may want to do something different for the states
+                while (tu_internal_node_dequeue(node, &data)) {
+                    worker_exec_state(worker, node, &data);
+                }
             }
             node_idx += 1;
+        } else {
+            // the worker is not affected to the node. In that case, we look
+            // all the nodes until we find an element to process. When we were
+            // able to process one element, we come back to check our nodes.
+            if (!tu_internal_node_dequeue(node, &data)) {
+                node_idx += 1;
+                continue;
+            }
+            if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
+                worker_node_exec(worker, node, &data);
+            } else {
+                worker_exec_state(worker, node, &data);
+            }
+            worker->process_count = 0;
+            node_idx = node_lb;
         }
     }
 }

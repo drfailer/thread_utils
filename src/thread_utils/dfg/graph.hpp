@@ -8,7 +8,6 @@
 #define SRC_THREAD_UTILS_DFG_GRAPH
 #include "decl.hpp"
 #include "profiling.hpp"
-#include "../data_structures/array_map.hpp"
 
 enum TU_GraphNodeKind {
     TU_GRAPH_NODE_KIND_TASK,
@@ -26,9 +25,9 @@ struct TU_GraphSink {
 // field to null don't implement the behavior, it is more flexible than a
 // base).
 struct TU_GraphExecNodeBase {
-    TU_ArrayMap<TU_TypeId, TU_GraphNodeQueue> queues = {};
-    TU_ArrayMap<TU_TypeId, TU_NodeExec> execs = {};
-    TU_ArrayMap<TU_TypeId, TU_Set<TU_GraphNode *>> successors = {};
+    TU_Map<TU_TypeId, TU_GraphNodeQueue> queues = {};
+    TU_Map<TU_TypeId, TU_NodeExec> execs = {};
+    TU_Map<TU_TypeId, TU_Set<TU_GraphNode *>> successors = {};
     TU_GraphSink *sink = nullptr;
     tu_u64 group = 0;
     TU_GraphExecNodeBaseProfileInfos prof_infos;

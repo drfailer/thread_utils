@@ -9,11 +9,11 @@ static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types
                                             tu_u64 group) {
     auto b_exec = new TU_GraphExecNodeBase();
     for (TU_TypeId type : input_types) {
-        b_exec->execs.insert(type, nullptr);
-        b_exec->queues.insert(type, TU_GraphNodeQueue{});
+        b_exec->execs.insert({type, nullptr});
+        b_exec->queues.insert({type, TU_GraphNodeQueue{}});
     }
     for (TU_TypeId type : output_types) {
-        b_exec->successors.insert(type, TU_Set<TU_GraphNode *>{});
+        b_exec->successors.insert({type, TU_Set<TU_GraphNode *>{}});
     }
     b_exec->sink = nullptr;
     b_exec->group = group;
@@ -137,16 +137,16 @@ bool tu_exec(TU_GraphNode *node, TU_TypeId type, TU_NodeExec exec) {
         return false;
     }
     assert(node->b_exec != nullptr);
-    auto [exec_ptr, exec_found] = node->b_exec->execs[type];
-    if (!exec_found) {
+    auto exec_it = node->b_exec->execs.find(type);
+    if (exec_it == node->b_exec->execs.end()) {
         printf("[TU_ERROR]: node `%s' cannot implement execute for type `%ld' (input type missmatch).\n",
                node->name, type);
         return false;
     }
-    if (*exec_ptr != nullptr) {
+    if (exec_it->second != nullptr) {
         printf("[TU_WARN]: overriding node `%s' execute for type `%ld'", node->name, type);
     }
-    *exec_ptr = exec;
+    exec_it->second = exec;
     return true;
 }
 
@@ -222,11 +222,12 @@ bool tu_add_input(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
                node->name, graph->name, type);
         return false;
     }
-    if (!graph->inputs.contains(type)) {
+    auto inputs_it = graph->inputs.find(type);
+    if (inputs_it == graph->inputs.end()) {
         printf("[TU_ERROR]: graph `%s' does not have type `%ld' as input\n", graph->name, type);
         return false;
     }
-    graph->inputs[type].insert(node);
+    inputs_it->second.insert(node);
     return true;
 }
 
@@ -239,8 +240,9 @@ bool tu_add_inputs(TU_Graph *graph, TU_GraphNode *node) {
     assert(node->b_exec != nullptr);
     bool input_added = false;
     for (auto &[type, exec] : node->b_exec->execs) {
-        if (graph->inputs.contains(type)) {
-            graph->inputs[type].insert(node);
+        auto inputs_it = graph->inputs.find(type);
+        if (inputs_it != graph->inputs.end()) {
+            inputs_it->second.insert(node);
             input_added = true;
         }
     }
@@ -257,7 +259,8 @@ bool tu_add_output(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
     if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
         return tu_add_output_graph(graph, node->sub_type.graph, type);
     }
-    if (!graph->outputs.contains(type)) {
+    auto outputs_it = graph->outputs.find(type);
+    if (outputs_it == graph->outputs.end()) {
         printf("[TU_ERROR]: tu_add_output, the graph `%s' does not output type `%ld'.\n",
                graph->name, type);
         return false;
@@ -268,7 +271,7 @@ bool tu_add_output(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
                node->name, graph->name, type);
         return true; // it is a warning so we don't fail
     }
-    graph->outputs[type].insert(node);
+    outputs_it->second.insert(node);
     node->b_exec->sink = &graph->sink;
     return true;
 }
@@ -282,8 +285,9 @@ bool tu_add_outputs(TU_Graph *graph, TU_GraphNode *node) {
     assert(node->b_exec != nullptr);
     bool output_added = false;
     for (auto &[type, successor] : node->b_exec->successors) {
-        if (graph->outputs.contains(type)) {
-            graph->outputs[type].insert(node);
+        auto outputs_it = graph->outputs.find(type);
+        if (outputs_it != graph->outputs.end()) {
+            outputs_it->second.insert(node);
             output_added = true;
         }
     }
@@ -322,13 +326,13 @@ bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
 
     // for standard nodes, we just need to add a successor when the types match
     assert(sender->b_exec != nullptr);
-    auto [successor_list, successor_list_found] = sender->b_exec->successors[type];
-    if (!successor_list_found || !receiver->b_exec->execs.contains(type)) {
+    auto successors_it = sender->b_exec->successors.find(type);
+    if (successors_it == sender->b_exec->successors.end() || !receiver->b_exec->execs.contains(type)) {
         printf("[TU_ERROR]: cannot draw edge `%s' -> `%s' for type `%ld'.\n",
                sender->name, receiver->name, type);
         return false;
     }
-    successor_list->insert(receiver);
+    successors_it->second.insert(receiver);
     return true;
 }
 
@@ -363,9 +367,9 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     // for standard nodes, we connect all the common types
     assert(receiver->b_exec != nullptr);
     for (auto &[type, exec] : receiver->b_exec->execs) {
-        auto [successor_list, successor_list_found] = sender->b_exec->successors[type];
-        if (successor_list_found) {
-            successor_list->insert(receiver);
+        auto successors_it = sender->b_exec->successors.find(type);
+        if (successors_it != sender->b_exec->successors.end()) {
+            successors_it->second.insert(receiver);
         }
     }
     return true;
@@ -398,8 +402,8 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
         result_sinked = true;
     }
 
-    auto [successor_list, successor_list_found] = node->b_exec->successors[type];
-    if (!successor_list_found) {
+    auto successors_it = node->b_exec->successors.find(type);
+    if (successors_it == node->b_exec->successors.end()) {
         if (!result_sinked) {
             printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
                    type, node->name);
@@ -408,7 +412,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
         }
         return;
     }
-    for (TU_GraphNode *successor : *successor_list) {
+    for (TU_GraphNode *successor : successors_it->second) {
         tu_internal_node_enqueue(&exec_ctx->dfg_ctx, successor, &data);
     }
     tu_internal_result_end(node->b_exec, &sw);
@@ -439,9 +443,9 @@ void tu_internal_node_enqueue(TU_DfgContext *dfg_ctx, TU_GraphNode *node, TU_Gra
     if (!ptr_arg_check(node)) return;
     if (!ptr_arg_check(data)) return;
     assert(node->b_exec != nullptr);
-    auto [queue, queue_found] = node->b_exec->queues[data->type];
-    assert(queue_found);
-    queue->push(*data);
+    auto queue_it = node->b_exec->queues.find(data->type);
+    assert(queue_it != node->b_exec->queues.end());
+    queue_it->second.push(*data);
     tu_internal_node_notify_workers(dfg_ctx, node);
 }
 

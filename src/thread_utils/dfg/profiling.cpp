@@ -139,7 +139,8 @@ static void graph_print_worker_infos(TU_DfgWorker const &worker, std::ofstream &
     fs << td << "w" << worker.id << "</td>"
        << td << tu_duration_to_string(worker.prof_infos.work_time) << " (work count = " << worker.prof_infos.work_count << ")</td>"
        << td << tu_duration_to_string(worker.prof_infos.sleep_time) << "</td>";
-    for (auto &[node, infos] : worker.prof_infos.exec_dur) {
+    for (auto node : worker.group->nodes) {
+        auto infos = worker.prof_infos.exec_dur.at(node);
         auto node_ttl_exec = node->b_exec->prof_infos.exec_dur.load();
         auto ttl_exec = infos.first;
         TU_Duration avg_exec = {};

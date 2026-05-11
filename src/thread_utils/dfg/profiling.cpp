@@ -63,7 +63,8 @@ static std::string get_exec_node_label(TU_GraphNode *node) {
     std::ostringstream oss;
 
     dot_table_begin(oss);
-    oss << "<tr><td colspan=\"2\">" << node->name << "</td></tr>" << sep;
+    oss << "<tr><td colspan=\"2\">" << node->name << " x" << node->b_exec->max_thread_count
+        << "</td></tr>" << sep;
     for (auto &[type, queue] : node->b_exec->queues) {
         if constexpr (requires { queue.prof_str(); }) {
             oss << "<tr><td>queue[" << type << "]</td><td>" << queue.prof_str() << "</td></tr>" << sep;
@@ -188,7 +189,9 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
             size_t dur = node->b_exec->prof_infos.exec_dur.load();
             std::string node_exec_avg = tu_duration_to_string(TU_Duration(dur / count));
             std::string node_exec_ttl = tu_duration_to_string(TU_Duration(dur));
-            fs << "<td bgcolor=\"lightgray\">" << node->name << " (" << node_exec_avg << " / " << node_exec_ttl << " - " << count << ")</td>";
+            fs << "<td bgcolor=\"lightgray\">" << node->name
+               << " (" << node_exec_avg << " / " << node_exec_ttl << " - " << count << ")"
+               << " | max_threads = " << node->b_exec->max_thread_count << "</td>";
             // TODO: it is not great to modify the profile infos here
             node->b_exec->prof_infos.worker_count = 0;
         }

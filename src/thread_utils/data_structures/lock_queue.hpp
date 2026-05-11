@@ -1,6 +1,7 @@
 #ifndef THREAD_UTILS_DATA_STRUCTURES_LOCK_QUEUE
 #define THREAD_UTILS_DATA_STRUCTURES_LOCK_QUEUE
 #include <queue>
+#include <cassert>
 #include "../common.hpp"
 
 template <typename T>

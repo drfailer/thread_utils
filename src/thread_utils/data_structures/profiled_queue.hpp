@@ -67,10 +67,10 @@ std::string TU_ProfiledQueue<Q>::prof_str() const {
     // enqueue
     size_t count = push_count.load();
     std::string push_dur_ttl = tu_duration_to_string(TU_Duration(push_dur.load()));
-    std::string push_dur_avg = tu_duration_to_string(TU_Duration(push_dur.load() / count));
+    std::string push_dur_avg = count == 0 ? "0ns" : tu_duration_to_string(TU_Duration(push_dur.load() / count));
     // dequeue
     std::string pop_dur_ttl = tu_duration_to_string(TU_Duration(pop_dur.load()));
-    std::string pop_dur_avg = tu_duration_to_string(TU_Duration(pop_dur.load() / count));
+    std::string pop_dur_avg = count == 0 ? "0ns" : tu_duration_to_string(TU_Duration(pop_dur.load() / count));
     oss << "<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"5\">\n";
     oss << "<tr><td>QS:</td><td>" << qs.load() << "</td></tr>\n";
     oss << "<tr><td>MQS:</td><td>" << mqs.load() << "</td></tr>\n";

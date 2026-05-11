@@ -7,6 +7,7 @@
 #include <string>
 #include <set>
 #include <iomanip>
+#include <cmath>
 
 /******************************************************************************/
 /*                          exec base profile helper                          */
@@ -100,14 +101,33 @@ static void graph_print_sink(TU_Graph *graph, std::ofstream &fs) {
     }
 }
 
-static void graph_print_content(TU_Graph *graph, std::ofstream &fs, size_t level) {
+static std::string get_node_color(TU_GraphNode *node, TU_Duration exec_time) {
+    std::string color = "#000000";
+    auto exec_dur = node->b_exec->prof_infos.exec_dur.load();
+    auto worker_count = node->b_exec->prof_infos.worker_count;
+    auto exec_ttl = TU_Duration(exec_dur / worker_count);
+    // stollen from Hedgehog:
+    auto posRedToBlue = (uint64_t) std::round((double) exec_ttl.count() / (double) exec_time.count() * 255);
+    posRedToBlue = std::clamp(posRedToBlue, (uint64_t) 0, (uint64_t) 255);
+    std::stringstream ss;
+    ss << "#"
+       << std::setfill('0') << std::setw(2) << std::hex << posRedToBlue
+       << "00"
+       << std::setfill('0') << std::setw(2) << std::hex << 255 - posRedToBlue;
+
+    return ss.str();
+}
+
+static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration exec_time, size_t level) {
     if (!ptr_arg_check(graph)) return;
     // print the nodes
     for (TU_GraphNode *node : graph->nodes) {
         switch (node->kind) {
         case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
         case TU_GRAPH_NODE_KIND_STATE: {
-            fs << ADDR(node) << " [label=<" << get_exec_node_label(node) << ">,shape=none];" << std::endl;
+            std::string color = get_node_color(node, exec_time);
+            fs << ADDR(node) << " [label=<" << get_exec_node_label(node)
+                << ">,shape=rect,color=\"" << color << "\",penwidth=3];" << std::endl;
             for (auto &[type, successors] : node->b_exec->successors) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
@@ -120,7 +140,7 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, size_t level
         case TU_GRAPH_NODE_KIND_GRAPH:
             fs << "subgraph " << ADDR(node->sub_type.graph) << "{" << std::endl;
             fs << "label=\"" << node->sub_type.graph->name << "\";" << std::endl;
-            graph_print_content(node->sub_type.graph, fs, level + 1);
+            graph_print_content(node->sub_type.graph, fs, exec_time, level + 1);
             fs << "}\\n";
             break;
         }
@@ -207,6 +227,6 @@ void tu_graph_print_to_dot(TU_Dfg *dfg, const char *filename) {
     graph_print_runner_infos(dfg, fs);
     graph_print_souce(dfg->graph, fs);
     graph_print_sink(dfg->graph, fs);
-    graph_print_content(dfg->graph, fs, 0);
+    graph_print_content(dfg->graph, fs, dfg->prof_infos.execution_time, 0);
     fs << "}\n";
 }

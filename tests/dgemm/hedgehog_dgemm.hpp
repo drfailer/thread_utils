@@ -21,11 +21,15 @@ using BTilePtr = std::shared_ptr<BTile>;
 using CTilePtr = std::shared_ptr<CTile>;
 using PTilePtr = std::shared_ptr<PTile>;
 
-struct SplitTask : hh::AbstractTask<3, AMat, BMat, CMat, ATile, BTile, CTile> {// {{{
+#define TaskType hh::AbstractTask
+// #define TaskType hh::AbstractAtomicTask
+#define CopyTaskType hh::AbstractTask
+
+struct SplitTask : TaskType<3, AMat, BMat, CMat, ATile, BTile, CTile> {// {{{
     size_t tile_size;
 
     SplitTask(size_t tile_size, size_t numThreads)
-        : hh::AbstractTask<3, AMat, BMat, CMat, ATile, BTile, CTile>("split_task", numThreads),
+        : TaskType<3, AMat, BMat, CMat, ATile, BTile, CTile>("split_task", numThreads),
           tile_size(tile_size) {}
 
     void execute(std::shared_ptr<AMat> A) override { exec<MatrixKind::A>(std::move(A)); }
@@ -51,15 +55,15 @@ struct SplitTask : hh::AbstractTask<3, AMat, BMat, CMat, ATile, BTile, CTile> {/
         }
     }
 
-    std::shared_ptr<hh::AbstractTask<3, AMat, BMat, CMat, ATile, BTile, CTile>>
+    std::shared_ptr<CopyTaskType<3, AMat, BMat, CMat, ATile, BTile, CTile>>
     copy() override {
         return std::make_shared<SplitTask>(tile_size, this->numberThreads());
     }
 };// }}}
 
-struct ProductTask : hh::AbstractTask<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile> {// {{{
+struct ProductTask : TaskType<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile> {// {{{
     ProductTask(size_t numThreads)
-        : hh::AbstractTask<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile>("product_task", numThreads) {}
+        : TaskType<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile>("product_task", numThreads) {}
 
     void execute(std::shared_ptr<std::tuple<ATilePtr, BTilePtr, PTilePtr>> tiles) override {
         auto [a, b, p] = *tiles;
@@ -74,15 +78,15 @@ struct ProductTask : hh::AbstractTask<1, std::tuple<ATilePtr, BTilePtr, PTilePtr
         this->addResult(p);
     }
 
-    std::shared_ptr<hh::AbstractTask<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile>>
+    std::shared_ptr<CopyTaskType<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile>>
     copy() override {
         return std::make_shared<ProductTask>(this->numberThreads());
     }
 };// }}}
 
-struct SumTask : hh::AbstractTask<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
+struct SumTask : TaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
     SumTask(size_t numThreads)
-        : hh::AbstractTask<1, std::tuple<PTilePtr, CTilePtr>, CTile>("sum_task", numThreads) {}
+        : TaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile>("sum_task", numThreads) {}
 
     void execute(std::shared_ptr<std::tuple<PTilePtr, CTilePtr>> tiles) override {
         auto [p, c] = *tiles;
@@ -97,7 +101,7 @@ struct SumTask : hh::AbstractTask<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// 
         this->addResult(c);
     }
 
-    std::shared_ptr<hh::AbstractTask<1, std::tuple<PTilePtr, CTilePtr>, CTile>>
+    std::shared_ptr<CopyTaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile>>
     copy() override {
         return std::make_shared<SumTask>(this->numberThreads());
     }
@@ -105,11 +109,11 @@ struct SumTask : hh::AbstractTask<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// 
 
 #define ComputeTaskI AMat, BMat, CMat, std::tuple<ATilePtr, BTilePtr, PTilePtr>, std::tuple<PTilePtr, CTilePtr>
 #define ComputeTaskO ATile, BTile, CTile, PTile
-struct ComputeTask : hh::AbstractTask<5, ComputeTaskI, ComputeTaskO> {// {{{
+struct ComputeTask : TaskType<5, ComputeTaskI, ComputeTaskO> {// {{{
     size_t tile_size;
 
     ComputeTask(size_t tile_size, size_t numThreads)
-        : hh::AbstractTask<5, ComputeTaskI, ComputeTaskO>("ComputeTask", numThreads),
+        : TaskType<5, ComputeTaskI, ComputeTaskO>("ComputeTask", numThreads),
           tile_size(tile_size) {}
 
     void execute(std::shared_ptr<AMat> A) override { exec<MatrixKind::A>(std::move(A)); }// {{{
@@ -159,13 +163,13 @@ struct ComputeTask : hh::AbstractTask<5, ComputeTaskI, ComputeTaskO> {// {{{
         this->addResult(c);
     }// }}}
 
-    std::shared_ptr<hh::AbstractTask<5, ComputeTaskI, ComputeTaskO>>
+    std::shared_ptr<CopyTaskType<5, ComputeTaskI, ComputeTaskO>>
     copy() override {
         return std::make_shared<ComputeTask>(tile_size, this->numberThreads());
     }
 };// }}}
 
-struct ProductState : hh::AbstractTask<2, ATile, BTile, std::tuple<ATilePtr, BTilePtr, PTilePtr>> {// {{{
+struct ProductState : TaskType<2, ATile, BTile, std::tuple<ATilePtr, BTilePtr, PTilePtr>> {// {{{
     size_t TM, TN, TK;
     size_t count;
     std::vector<ATilePtr> A_tiles;
@@ -213,7 +217,7 @@ struct ProductState : hh::AbstractTask<2, ATile, BTile, std::tuple<ATilePtr, BTi
     }
 };// }}}
 
-struct SumState : hh::AbstractTask<2, CTile, PTile, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
+struct SumState : TaskType<2, CTile, PTile, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
     size_t TM, TN, TK;
     size_t count;
     std::vector<std::vector<PTilePtr>> sum_queues;

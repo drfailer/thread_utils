@@ -10,8 +10,8 @@
 #include "defer.hpp"
 
 constexpr size_t M_SIZE = 10000;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 512;
-// #define DGEMM_HH
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 1024;
+#define DGEMM_HH
 
 #ifdef DGEMM_HH
 #include "hedgehog_dgemm.hpp"
@@ -393,15 +393,18 @@ void test_dgemm_hh(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     auto Cptr = std::shared_ptr<CMat>(reinterpret_cast<CMat *>(&C), [](CMat *){ /* do not delete */ });
     printf("\nrunning hh dgemm...\n");
     timer_start(dgemm_hh);
-    DgemmGraph tm(M, N, K, TILE_SIZE);
-    tm.executeGraph(true);
-    tm.pushData(Aptr);
-    tm.pushData(Bptr);
-    tm.pushData(Cptr);
-    tm.finishPushingData();
-    tm.waitForTermination();
+    DgemmGraph graph(M, N, K, TILE_SIZE);
+    graph.executeGraph(true);
+    graph.pushData(Aptr);
+    graph.pushData(Bptr);
+    graph.pushData(Cptr);
+    graph.finishPushingData();
+    graph.waitForTermination();
     timer_end(dgemm_hh);
     timer_report(dgemm_hh);
+
+    graph.createDotFile("graph_hh.dot", hh::ColorScheme::EXECUTION, hh::StructureOptions::QUEUE);
+
     matrix_print(C);
     if (!matrix_test_equal(C, E)) {
         printf("dgemm_hh(%ld, %ld, %ld, %ld) failed.\n", M, N, K, TILE_SIZE);

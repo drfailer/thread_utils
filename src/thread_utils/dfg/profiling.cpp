@@ -68,12 +68,6 @@ static std::string get_exec_node_label(TU_GraphNode *node) {
             oss << "<tr><td>queue[" << type << "]</td><td>" << queue.prof_str() << "</td></tr>" << sep;
         }
     }
-    if (node->kind == TU_GRAPH_NODE_KIND_STATE) {
-        auto const &queue = node->sub_type.state->protected_queue;
-        if constexpr (requires { queue.prof_str(); }) {
-            oss << "<tr><td>protected queue</td><td>" << queue.prof_str() << "</td></tr>" << sep;
-        }
-    }
     oss << "<tr><td colspan=\"2\">" << node->b_exec->prof_infos.prof_str() << "</td></tr>";
     // TODO: I also want to profile the map acces times
     // TODO: We need the lock time for the state
@@ -186,6 +180,7 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
            << "\">group: " << group->id << "<br/>"
            << "worker count = " << worker_count << "<br/>"
            << "cache size = " << group->workers_cache_size << "<br/>"
+           << "dequeue count = " << group->max_dequeue_count << "<br/>"
            << "</td>";
         for (size_t i = 0; i < worker_count; ++i) {
             if (i > 0) { fs << "<tr>"; }

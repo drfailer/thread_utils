@@ -281,7 +281,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
     // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
 
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 16);
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 2, 32);
     tu_u64 split_group = group;
     tu_u64 product_group = group;
     tu_u64 sum_group = group;
@@ -324,9 +324,9 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
         .TK = TK,
     };
 
-    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group);
-    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group);
+    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group, 3);
+    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group, 40);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group, 10);
     auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, product_state_group);
     auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, sum_state_group);
 
@@ -423,9 +423,9 @@ int main(int, char **) {
     // test_dgemm_tm(A, B, C, E);
     matrix_zero(C);
     test_dgemm_dfg(A, B, C, E);
-// #ifdef DGEMM_HH
-//     matrix_zero(C);
-//     test_dgemm_hh(A, B, C, E);
-// #endif // DGEMM_HH
+#ifdef DGEMM_HH
+    matrix_zero(C);
+    test_dgemm_hh(A, B, C, E);
+#endif // DGEMM_HH
     return 0;
 }

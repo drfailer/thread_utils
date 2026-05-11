@@ -6,7 +6,7 @@
 
 static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types,
                                             TU_Set<TU_TypeId> const &output_types,
-                                            tu_u64 group) {
+                                            tu_u64 group, tu_u64 max_thread_count) {
     auto b_exec = new TU_GraphExecNodeBase();
     for (TU_TypeId type : input_types) {
         b_exec->execs.insert({type, nullptr});
@@ -17,13 +17,14 @@ static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types
     }
     b_exec->sink = nullptr;
     b_exec->group = group;
+    b_exec->max_thread_count = max_thread_count;
     return b_exec;
 }
 
 // TODO(ALLOCATOR): replace new with allocator
 static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const char *name, void *data,
                                TU_Set<TU_TypeId> const &input_types, TU_Set<TU_TypeId> const &output_types,
-                               tu_u64 dfg_group) {
+                               tu_u64 dfg_group, tu_u64 max_thread_count) {
     TU_GraphNode *node = new TU_GraphNode();
     node->b_exec = nullptr;
     node->kind = kind;
@@ -33,12 +34,12 @@ static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const cha
     case TU_GRAPH_NODE_KIND_TASK:
         node->sub_type.task = new TU_GraphTask();
         node->sub_type.task->data = data;
-        node->b_exec = make_exec_base(input_types, output_types, dfg_group);
+        node->b_exec = make_exec_base(input_types, output_types, dfg_group, max_thread_count);
         break;
     case TU_GRAPH_NODE_KIND_STATE:
         node->sub_type.state = new TU_GraphState();
         node->sub_type.state->data = data;
-        node->b_exec = make_exec_base(input_types, output_types, dfg_group);
+        node->b_exec = make_exec_base(input_types, output_types, dfg_group, max_thread_count);
         break;
     case TU_GRAPH_NODE_KIND_GRAPH:
         node->sub_type.graph = nullptr;
@@ -62,17 +63,17 @@ TU_Graph tu_graph_create(const char *name, TU_Set<TU_TypeId> const &input_types,
 }
 
 TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types,
-                      TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group) {
-    return make_node(graph, TU_GRAPH_NODE_KIND_TASK, name, data, input_types, output_types, dfg_group);
+                      TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group, tu_u64 max_thread_count) {
+    return make_node(graph, TU_GRAPH_NODE_KIND_TASK, name, data, input_types, output_types, dfg_group, max_thread_count);
 }
 
 TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types,
                        TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group) {
-    return make_node(graph, TU_GRAPH_NODE_KIND_STATE, name, data, input_types, output_types, dfg_group);
+    return make_node(graph, TU_GRAPH_NODE_KIND_STATE, name, data, input_types, output_types, dfg_group, 1);
 }
 
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph) {
-    TU_GraphNode *node = make_node(graph, TU_GRAPH_NODE_KIND_GRAPH, graph->name, nullptr, {}, {}, 0);
+    TU_GraphNode *node = make_node(graph, TU_GRAPH_NODE_KIND_GRAPH, graph->name, nullptr, {}, {}, 0, 0);
     node->sub_type.graph = sub_graph;
     // we need to reset the sink_graph pointer to avoid tasks to output to the
     // result queue for nothing

@@ -17,13 +17,14 @@ void tu_dfg_destroy(TU_Dfg *dfg) {
     dfg->groups.clear();
 }
 
-tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t cache_size) {
+tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count, size_t cache_size) {
     if (!ptr_arg_check(dfg)) return 0;
     assert(thread_count > 0);
     TU_DfgWorkerGroup *group = new TU_DfgWorkerGroup();
     group->id = dfg->groups.size();
     group->dfg = dfg;
     group->workers = std::vector<TU_DfgWorker>(thread_count);
+    group->max_dequeue_count = max_dequeue_count;
     group->workers_cache_size = cache_size;
     size_t worker_id = 0;
     for (auto &worker : group->workers) {
@@ -55,6 +56,7 @@ static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
             }
             auto group = dfg->groups[node->b_exec->group];
             group->nodes.push_back(node);
+            group->worker_counts.emplace_back(0);
             for (auto &worker : group->workers) {
                 worker.prof_infos.exec_dur[node] = {};
             }
@@ -176,78 +178,25 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     worker->process_count += 1;
 }
 
-static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
-    assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
-    assert(data->data != nullptr);
-    TU_GraphState *state = node->sub_type.state;
-
-    // we use memory_order_acq_rel to make sure the counter is properly
-    // synchronized between the threads and makes sure at least one thread gets
-    // the ownership on the queue.
-    if (state->counter.fetch_add(1, std::memory_order_acq_rel) == 0) {
-        // process the data
-        worker_node_exec(worker, node, data);
-        if (state->counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            return;
-        }
-
-        // the thread takes the ownership of the state
-        for (;;) {
-            TU_GraphData local_data;
-            while (state->protected_queue.pop(&local_data)) {
-                worker_node_exec(worker, node, &local_data);
-                // memory_order_acq_rel makes sure that either we see the
-                // increment of another thread (avoid leaving too early), or
-                // that other threads see the decrement (guaranties that this
-                // thread keeps the ownership or that another threads get it:
-                // in any case, one thread should have the ownership if the
-                // queue is not empty).
-                if (state->counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-                    return;
-                }
-            }
-            // The queue is empty but the counter has been incremented by
-            // another thread so we wait until we can pop again. This avoid
-            // leaving while the queue is not empty
-            std::atomic_thread_fence(std::memory_order_acquire);
-            cross_platform_yield();
-        }
-    } else {
-        // the data is moved from the main state queue to the protected queue
-        // that is own by one worker (MPSC). Data needs to be dequeued from the
-        // main queue to avoid workers decrementing the group semaphore for
-        // nothing and end up dead locked.
-        state->protected_queue.push(*data);
-    }
-}
-
 static void worker_process_cache(TU_DfgWorker *worker) {
     for (TU_GraphOperation op = {}; worker->cache.pop(&op);) {
         worker_node_exec(worker, op.node, &op.data);
     }
 }
 
-static void worker_process_task_queue_with_cache(TU_DfgWorker *worker, TU_GraphNode *node) {
-    for (;;) {
-        for (size_t cache_counter = 0; cache_counter < worker->cache.size; ++cache_counter) {
+// For tasks, workers try to dequeue up to a user specified amount of data to
+// process before moving to the next node.
+static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+    assert(node->kind == TU_GRAPH_NODE_KIND_TASK);
+    if (worker->group->max_dequeue_count > 1) {
+        for (size_t i = 0; i < worker->group->max_dequeue_count; ++i) {
             TU_GraphData data = {};
             if (!tu_internal_node_dequeue(node, &data)) {
                 break;
             }
-            TU_GraphOperation op{data, node};
-            TU_GraphOperation poped_op; // unused
-            bool poped = worker->cache.cache(op, &poped_op);
-            assert(poped == false);
+            worker_node_exec(worker, node, &data);
         }
-        if (worker->cache.count() == 0) {
-            return;
-        }
-        worker_process_cache(worker);
-    }
-}
-
-static void worker_process_task_queue_no_cache(TU_DfgWorker *worker, TU_GraphNode *node) {
-    for (;;) {
+    } else {
         TU_GraphData data = {};
         if (!tu_internal_node_dequeue(node, &data)) {
             return;
@@ -256,75 +205,48 @@ static void worker_process_task_queue_no_cache(TU_DfgWorker *worker, TU_GraphNod
     }
 }
 
-static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
-    if (worker->cache.size > 0) {
-        worker_process_task_queue_with_cache(worker, node);
-    } else {
-        worker_process_task_queue_no_cache(worker, node);
+// States are processed by only one worker at a time. Once a worker has taken
+// the ownership of the state, it processes all the elements untill the queue is
+// empty (unlike with tasks, we don't want to leave the state whire the queue
+// is not empty).
+static void worker_process_state_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+    assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
+    TU_GraphData data = {};
+    while (tu_internal_node_dequeue(node, &data)) {
+        worker_node_exec(worker, node, &data);
     }
 }
 
-
-// TODO: we could count the number of workers on each node to try balancing the
-//       workload.
 static void worker_process_queues(TU_DfgWorker *worker) {
     size_t node_count = worker->group->nodes.size();
-    size_t worker_count = worker->group->workers.size();
-    size_t node_lb = 0;
-    size_t node_ub = 0;
-
-    if (node_count < worker_count) {
-        size_t worker_per_node = worker_count / node_count;
-        node_lb = worker->id / worker_per_node;
-        node_ub = node_lb + 1;
-    } else {
-        size_t node_per_worker = node_count / worker_count;
-        node_lb = node_count * worker->id;
-        node_ub = node_lb + node_per_worker;
-    }
-    assert(node_lb < node_count);
 
     worker->process_count = 0;
     size_t node_idx = 0;
     for (;;) {
+        assert(node_idx < worker->group->nodes.size());
+        assert(node_idx < worker->group->worker_counts.size());
+        TU_GraphNode *node = worker->group->nodes[node_idx];
+        std::atomic_ref<size_t> worker_count(worker->group->worker_counts[node_idx]);
+
+        // Each nodes has a maximum number of workers that can process its
+        // queue at the same time
+        if (worker_count.fetch_add(1) < node->b_exec->max_thread_count) {
+            switch (node->kind) {
+            case TU_GRAPH_NODE_KIND_STATE: worker_process_state_queue(worker, node); break;
+            case TU_GRAPH_NODE_KIND_TASK: worker_process_task_queue(worker, node); break;
+            default: assert(false && "we shouldn't arrive here"); break;
+            }
+        }
+
         // when the node count is reach, we restart, unless all the queues are empty
+        node_idx += 1;
+        worker_count -= 1;
         if (node_idx >= node_count) {
             if (worker->process_count == 0) {
                 return;
             }
             worker->process_count = 0;
             node_idx = 0;
-        }
-
-        TU_GraphNode *node = worker->group->nodes[(node_idx + node_lb) % node_count];
-        TU_GraphData data = {};
-        if (node_lb <= node_idx && node_idx < node_ub) {
-            // the worker is affected to the current node, therefore we process
-            // all the elements until the queue is empty
-            if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
-                worker_process_task_queue(worker, node);
-            } else {
-                // TODO: we may want to do something different for the states
-                while (tu_internal_node_dequeue(node, &data)) {
-                    worker_exec_state(worker, node, &data);
-                }
-            }
-            node_idx += 1;
-        } else {
-            // the worker is not affected to the node. In that case, we look
-            // all the nodes until we find an element to process. When we were
-            // able to process one element, we come back to check our nodes.
-            if (!tu_internal_node_dequeue(node, &data)) {
-                node_idx += 1;
-                continue;
-            }
-            if (node->kind == TU_GRAPH_NODE_KIND_TASK) {
-                worker_node_exec(worker, node, &data);
-            } else {
-                worker_exec_state(worker, node, &data);
-            }
-            worker->process_count = 0;
-            node_idx = node_lb;
         }
     }
 }

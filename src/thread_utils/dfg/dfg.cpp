@@ -203,6 +203,7 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
         }
         worker_node_exec(worker, node, &data);
     }
+    worker_process_cache(worker);
 }
 
 // States are processed by only one worker at a time. Once a worker has taken

@@ -177,20 +177,19 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
 
 static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
     assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
-    TU_GraphState *state = node->sub_type.state;
-
     assert(data->data != nullptr);
-
-    // the data is moved from the main state queue to the protected queue that
-    // is own by one worker (MPSC). Data needs to be dequeued from the main
-    // queue to avoid workers decrementing the group semaphore for nothing and
-    // end up dead locked.
-    state->protected_queue.push(*data);
+    TU_GraphState *state = node->sub_type.state;
 
     // we use memory_order_acq_rel to make sure the counter is properly
     // synchronized between the threads and makes sure at least one thread gets
     // the ownership on the queue.
     if (state->counter.fetch_add(1, std::memory_order_acq_rel) == 0) {
+        // process the data
+        worker_node_exec(worker, node, data);
+        if (state->counter.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+            return;
+        }
+
         // the thread takes the ownership of the state
         for (;;) {
             TU_GraphData local_data;
@@ -212,6 +211,12 @@ static void worker_exec_state(TU_DfgWorker *worker, TU_GraphNode *node, TU_Graph
             std::atomic_thread_fence(std::memory_order_acquire);
             cross_platform_yield();
         }
+    } else {
+        // the data is moved from the main state queue to the protected queue
+        // that is own by one worker (MPSC). Data needs to be dequeued from the
+        // main queue to avoid workers decrementing the group semaphore for
+        // nothing and end up dead locked.
+        state->protected_queue.push(*data);
     }
 }
 

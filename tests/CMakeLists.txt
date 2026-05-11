@@ -5,7 +5,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../src)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../common)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/common)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/dgemm)
-include_directories(${CMAKE_SOURCE_DIR}/../hedgehog/hedgehog)
+include_directories(${CMAKE_SOURCE_DIR}/lib/hedgehog/hedgehog)
 
 add_compile_options("-O3")
 

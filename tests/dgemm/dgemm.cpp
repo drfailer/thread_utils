@@ -275,13 +275,21 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
 
-    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0);
-    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0);
-    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0);
-    // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
-    // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
+    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0, 0);
+    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0, 0);
+    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0, 0);
+    // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 0);
+    // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 0);
 
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 2, 32);
+    // tu_u64 task_group = tu_dfg_add_worker_group(&dfg, 40, 128, 32);
+    // tu_u64 state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 32);
+    // tu_u64 split_group = task_group;
+    // tu_u64 product_group = task_group;
+    // tu_u64 sum_group = task_group;
+    // tu_u64 product_state_group = state_group;
+    // tu_u64 sum_state_group = state_group;
+
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 4, 32);
     tu_u64 split_group = group;
     tu_u64 product_group = group;
     tu_u64 sum_group = group;
@@ -326,7 +334,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group, 3);
     auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group, 40);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group, 10);
+    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group, 40);
     auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, product_state_group);
     auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, sum_state_group);
 

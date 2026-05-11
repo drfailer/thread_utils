@@ -147,6 +147,8 @@ static void graph_print_worker_infos(TU_DfgWorker const &worker, std::ofstream &
         double percent_exec = 100 * ((double)ttl_exec.count() / (double)node_ttl_exec);
         if (infos.second > 0) {
             avg_exec = TU_Duration(ttl_exec.count() / infos.second);
+            // TODO: it is not great to modify the profile infos here
+            node->b_exec->prof_infos.worker_count += 1;
         }
         fs << td << tu_duration_to_string(avg_exec)
            << " / " << tu_duration_to_string(ttl_exec)
@@ -173,12 +175,18 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
             std::string node_exec_avg = tu_duration_to_string(TU_Duration(dur / count));
             std::string node_exec_ttl = tu_duration_to_string(TU_Duration(dur));
             fs << "<td bgcolor=\"lightgray\">" << node->name << " (" << node_exec_avg << " / " << node_exec_ttl << " - " << count << ")</td>";
+            // TODO: it is not great to modify the profile infos here
+            node->b_exec->prof_infos.worker_count = 0;
         }
         fs << "</tr>" << sep;
 
         // group infos
         size_t worker_count = group->workers.size();
-        fs << "<tr><td bgcolor=\"lightgray\" rowspan=\"" << worker_count << "\">group:" << std::to_string(group->id) << " (" << worker_count << " workers)</td>";
+        fs << "<tr><td bgcolor=\"lightgray\" rowspan=\"" << worker_count
+           << "\">group: " << group->id << "<br/>"
+           << "worker count = " << worker_count << "<br/>"
+           << "cache size = " << group->workers_cache_size << "<br/>"
+           << "</td>";
         for (size_t i = 0; i < worker_count; ++i) {
             if (i > 0) { fs << "<tr>"; }
             graph_print_worker_infos(group->workers[i], fs);

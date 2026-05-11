@@ -24,6 +24,7 @@ tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t cache_si
     group->id = dfg->groups.size();
     group->dfg = dfg;
     group->workers = std::vector<TU_DfgWorker>(thread_count);
+    group->workers_cache_size = cache_size;
     size_t worker_id = 0;
     for (auto &worker : group->workers) {
         worker.group = group;

@@ -37,10 +37,9 @@ struct TU_DfgWorkerGroup {
     TU_Array<TU_DfgWorker> workers = {};
     TU_Dfg *dfg = nullptr;
     tu_u64 id = 0;
-    TU_Array<TU_GraphNode *> nodes = {};
-    TU_Array<size_t> worker_counts = {};
     size_t workers_cache_size = 0;
     size_t max_dequeue_count = 0;
+    TU_Array<TU_GraphNode *> nodes = {};
 };
 
 // graph runner

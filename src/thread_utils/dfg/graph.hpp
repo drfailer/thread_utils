@@ -31,6 +31,7 @@ struct TU_GraphExecNodeBase {
     TU_GraphSink *sink = nullptr;
     tu_u64 group = 0;
     tu_u64 max_thread_count = 0;
+    alignas(64) TU_Atomic<size_t> thread_count = 0;
     TU_GraphExecNodeBaseProfileInfos prof_infos;
 };
 

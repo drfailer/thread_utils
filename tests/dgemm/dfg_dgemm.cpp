@@ -77,7 +77,7 @@ void product_state_exec_tile_a(TU_ExecContext *ctx, void *rawdata, tu_i64 type) 
     auto task_data = (ProductStateData*)tu_node_data(ctx);
     assert(type == T_TileA);
     auto tile = (MatrixTile*)rawdata;
-    size_t TM = task_data->TM, TN = task_data->TN, TK = task_data->TK;
+    size_t TN = task_data->TN, TK = task_data->TK;
 
     assert(task_data->A_tiles[tile->row * TK + tile->col] == nullptr);
     task_data->A_tiles[tile->row * TK + tile->col] = tile;

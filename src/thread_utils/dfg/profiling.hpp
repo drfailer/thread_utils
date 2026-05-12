@@ -6,10 +6,6 @@
 #include <string>
 #include <sstream>
 
-struct TU_GraphProfileInfo {
-    // TODO: global timer
-};
-
 struct TU_GraphExecNodeBaseProfileInfos {
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_count;
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_dur;

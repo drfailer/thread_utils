@@ -402,7 +402,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     bool result_sinked = false;
     TU_Stopwatch sw;
 
-    tu_internal_result_start(node->b_exec, &sw);
+    node->b_exec->prof_infos.result_begin(&sw);
 
     // when we need to add a global result, we add the data to the graph result
     // queue and we use the `result_sinked` flag to avoid generating a warning
@@ -419,7 +419,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
             printf("[TU_ERROR]: cannot add result of type `%ld' on node `%s', output type missmatch.\n",
                    type, node->name);
         } else {
-            tu_internal_result_end(node->b_exec, &sw);
+            node->b_exec->prof_infos.result_end(&sw);
         }
         return;
     }
@@ -429,7 +429,7 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
     for (auto node : output->second.nodes) {
         tu_internal_node_notify_workers(&exec_ctx->dfg_ctx, node);
     }
-    tu_internal_result_end(node->b_exec, &sw);
+    node->b_exec->prof_infos.result_end(&sw);
 }
 
 void *tu_node_data(TU_ExecContext *exec_ctx) {

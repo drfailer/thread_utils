@@ -69,7 +69,7 @@ void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph) {
                graph->name);
         return;
     }
-    dfg->sw = tu_stopwatch_start_new();
+    dfg->prof_infos.create_begin();
     dfg->graph = graph;
     dfg_register_nodes(dfg, graph);
 }
@@ -85,8 +85,8 @@ void tu_dfg_exec(TU_Dfg *dfg) {
             worker_start(&worker);
         }
     }
-    dfg->prof_infos.creation_time = tu_stopwatch_stop_and_get_time(&dfg->sw);
-    dfg->sw = tu_stopwatch_start_new();
+    dfg->prof_infos.create_end();
+    dfg->prof_infos.execute_begin();
 }
 
 void tu_dfg_term(TU_Dfg *dfg) {
@@ -100,7 +100,7 @@ void tu_dfg_term(TU_Dfg *dfg) {
             worker_stop(&worker);
         }
     }
-    dfg->prof_infos.execution_time = tu_stopwatch_stop_and_get_time(&dfg->sw);
+    dfg->prof_infos.execute_end();
 }
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
@@ -152,7 +152,6 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     assert(node != nullptr);
     assert(data != nullptr);
     assert(node->b_exec != nullptr);
-    TU_Stopwatch sw;
     TU_ExecContext exec_ctx = {
         .node = node,
         .dfg_ctx = {
@@ -161,15 +160,16 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
             .worker = worker,
         },
     };
-    tu_internal_exec_start(node->b_exec, &sw);
+    TU_Stopwatch sw;
+    worker->prof_infos.exec_begin(node);
+    node->b_exec->prof_infos.exec_begin(&sw);
+
     auto input = node->b_exec->inputs.find(data->type);
     assert(input != node->b_exec->inputs.end());
     input->second.exec(&exec_ctx, data->data, data->type);
-    tu_internal_exec_end(node->b_exec, &sw);
-    // worker profiling
-    auto &prof = worker->prof_infos.exec_dur[node];
-    prof.first += tu_stopwatch_get_time(&sw);
-    prof.second += 1;
+
+    node->b_exec->prof_infos.exec_end(&sw);
+    worker->prof_infos.exec_end(node);
     worker->process_count += 1;
 }
 
@@ -242,17 +242,16 @@ static void worker_run(TU_DfgWorker *worker) {
     assert(worker->group != nullptr);
     assert(worker->group->dfg != nullptr);
     for (;;) {
-        TU_Stopwatch sw = tu_stopwatch_start_new();
         worker->parked.store(true);
+        worker->prof_infos.sleep_begin();
         worker->group->sem.acquire();
-        worker->prof_infos.sleep_time += tu_stopwatch_stop_and_get_time(&sw);
+        worker->prof_infos.sleep_end();
         if (worker->can_terminate.load()) {
             break;
         }
-        tu_stopwatch_start(&sw);
         worker->parked.store(false);
+        worker->prof_infos.work_begin();
         worker_process_queues(worker);
-        worker->prof_infos.work_time += tu_stopwatch_stop_and_get_time(&sw);
-        worker->prof_infos.work_count += 1;
+        worker->prof_infos.work_end();
     }
 }

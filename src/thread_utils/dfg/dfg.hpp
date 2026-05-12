@@ -46,7 +46,6 @@ struct TU_Dfg {
     TU_Array<TU_DfgWorkerGroup *> groups = {};
     TU_Graph *graph = nullptr;
     TU_DfgProfileInfos prof_infos = {};
-    TU_Stopwatch sw;
 
     // constructors
     TU_Dfg() = default;

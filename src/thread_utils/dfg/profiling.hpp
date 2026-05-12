@@ -13,6 +13,24 @@ struct TU_GraphExecNodeBaseProfileInfos {
     alignas(CACHE_LINE) TU_Atomic<size_t> result_count;
     size_t worker_count;
 
+    void exec_begin(TU_Stopwatch *sw) {
+        tu_stopwatch_start(sw);
+    }
+
+    void exec_end(TU_Stopwatch *sw) {
+        this->exec_count += 1;
+        this->exec_dur += tu_stopwatch_stop_and_get_time(sw).count();
+    }
+
+    void result_begin(TU_Stopwatch *sw) {
+        tu_stopwatch_start(sw);
+    }
+
+    void result_end(TU_Stopwatch *sw) {
+        this->result_count += 1;
+        this->result_dur += tu_stopwatch_stop_and_get_time(sw).count();
+    }
+
     std::string prof_str() {
         std::ostringstream oss;
         std::string exec_avg = tu_duration_to_string(TU_Duration(exec_dur.load() / exec_count.load()));
@@ -27,21 +45,50 @@ struct TU_GraphExecNodeBaseProfileInfos {
     }
 };
 
-void tu_internal_exec_start(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
-void tu_internal_exec_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
-void tu_internal_result_start(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
-void tu_internal_result_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw);
-
 struct TU_DfgWorkerProfileInfos {
     TU_Map<TU_GraphNode *, std::pair<TU_Duration, size_t>> exec_dur = {};
     size_t work_count = 0;
     TU_Duration work_time = {};
     TU_Duration sleep_time = {};
+    TU_Stopwatch work_sleep_sw;
+    TU_Stopwatch exec_sw;
+
+    void sleep_begin() {
+        tu_stopwatch_start(&this->work_sleep_sw);
+    }
+    void sleep_end() {
+        this->sleep_time += tu_stopwatch_stop_and_get_time(&this->work_sleep_sw);
+    }
+
+    void work_begin() {
+        tu_stopwatch_start(&this->work_sleep_sw);
+        this->work_count += 1;
+    }
+    void work_end() {
+        this->work_time += tu_stopwatch_stop_and_get_time(&this->work_sleep_sw);
+    }
+
+    void exec_begin(TU_GraphNode *) {
+        tu_stopwatch_start(&this->exec_sw);
+    }
+    void exec_end(TU_GraphNode *node) {
+        this->exec_dur[node].first += tu_stopwatch_stop_and_get_time(&this->work_sleep_sw);
+        this->exec_dur[node].second += 1;
+    }
 };
 
 struct TU_DfgProfileInfos {
     TU_Duration creation_time;
     TU_Duration execution_time;
+    TU_Stopwatch sw;
+
+    // this profile information are always enabled because they don't alter the
+    // execution of the graph
+
+    void create_begin() { tu_stopwatch_start(&this->sw); }
+    void create_end() { this->creation_time = tu_stopwatch_stop_and_get_time(&this->sw); }
+    void execute_begin() { tu_stopwatch_start(&this->sw); }
+    void execute_end() { this->execution_time = tu_stopwatch_stop_and_get_time(&this->sw); }
 };
 
 void tu_graph_print_to_dot(TU_Dfg *dfg, const char *filename);

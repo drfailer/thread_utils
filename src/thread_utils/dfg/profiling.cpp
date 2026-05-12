@@ -9,27 +9,6 @@
 #include <iomanip>
 #include <cmath>
 
-/******************************************************************************/
-/*                          exec base profile helper                          */
-/******************************************************************************/
-
-void tu_internal_exec_start(TU_GraphExecNodeBase *, TU_Stopwatch *sw) {
-    tu_stopwatch_start(sw);
-}
-
-void tu_internal_exec_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw) {
-    b_exec->prof_infos.exec_count += 1;
-    b_exec->prof_infos.exec_dur += tu_stopwatch_stop_and_get_time(sw).count();
-}
-
-void tu_internal_result_start(TU_GraphExecNodeBase *, TU_Stopwatch *sw) {
-    tu_stopwatch_start(sw);
-}
-
-void tu_internal_result_end(TU_GraphExecNodeBase *b_exec, TU_Stopwatch *sw) {
-    b_exec->prof_infos.result_count += 1;
-    b_exec->prof_infos.result_dur += tu_stopwatch_stop_and_get_time(sw).count();
-}
 
 /******************************************************************************/
 /*                             print to dot file                              */

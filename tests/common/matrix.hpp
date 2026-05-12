@@ -46,7 +46,7 @@ struct TileTriplet {
 
 // functions ///////////////////////////////////////////////////////////////////
 
-bool matrix_test_equal(Matrix const &found, Matrix const&expected, double tolerance = 1e-6);
+bool matrix_test_equal(Matrix const &found, Matrix const&expected, double tolerance = 1e-9);
 void matrix_init_double(Matrix &m);
 void matrix_init_int(Matrix &m);
 void matrix_zero(Matrix &m);

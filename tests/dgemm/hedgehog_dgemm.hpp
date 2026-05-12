@@ -84,11 +84,11 @@ struct ProductTask : TaskType<1, std::tuple<ATilePtr, BTilePtr, PTilePtr>, PTile
     }
 };// }}}
 
-struct SumTask : TaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
+struct SumTask : TaskType<1, std::pair<PTilePtr, CTilePtr>, std::pair<PTilePtr, CTilePtr>> {// {{{
     SumTask(size_t numThreads)
-        : TaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile>("sum_task", numThreads) {}
+        : TaskType<1, std::pair<PTilePtr, CTilePtr>, std::pair<PTilePtr, CTilePtr>>("sum_task", numThreads) {}
 
-    void execute(std::shared_ptr<std::tuple<PTilePtr, CTilePtr>> tiles) override {
+    void execute(std::shared_ptr<std::pair<PTilePtr, CTilePtr>> tiles) override {
         auto [p, c] = *tiles;
         assert(p->rows == c->rows);
         assert(p->cols == c->cols);
@@ -98,17 +98,17 @@ struct SumTask : TaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
                 (*c)(row, col) += (*p)(row, col);
             }
         }
-        this->addResult(c);
+        this->addResult(tiles);
     }
 
-    std::shared_ptr<CopyTaskType<1, std::tuple<PTilePtr, CTilePtr>, CTile>>
+    std::shared_ptr<CopyTaskType<1, std::pair<PTilePtr, CTilePtr>, std::pair<PTilePtr, CTilePtr>>>
     copy() override {
         return std::make_shared<SumTask>(this->numberThreads());
     }
 };// }}}
 
-#define ComputeTaskI AMat, BMat, CMat, std::tuple<ATilePtr, BTilePtr, PTilePtr>, std::tuple<PTilePtr, CTilePtr>
-#define ComputeTaskO ATile, BTile, CTile, PTile
+#define ComputeTaskI AMat, BMat, CMat, std::tuple<ATilePtr, BTilePtr, PTilePtr>, std::pair<PTilePtr, CTilePtr>
+#define ComputeTaskO ATile, BTile, CTile, PTile, std::pair<PTilePtr, CTilePtr>
 struct ComputeTask : TaskType<5, ComputeTaskI, ComputeTaskO> {// {{{
     size_t tile_size;
 
@@ -150,7 +150,7 @@ struct ComputeTask : TaskType<5, ComputeTaskI, ComputeTaskO> {// {{{
         this->addResult(p);
     }// }}}
 
-    void execute(std::shared_ptr<std::tuple<PTilePtr, CTilePtr>> tiles) override {// {{{
+    void execute(std::shared_ptr<std::pair<PTilePtr, CTilePtr>> tiles) override {// {{{
         auto [p, c] = *tiles;
         assert(p->rows == c->rows);
         assert(p->cols == c->cols);
@@ -160,7 +160,7 @@ struct ComputeTask : TaskType<5, ComputeTaskI, ComputeTaskO> {// {{{
                 (*c)(row, col) += (*p)(row, col);
             }
         }
-        this->addResult(c);
+        this->addResult(tiles);
     }// }}}
 
     std::shared_ptr<CopyTaskType<5, ComputeTaskI, ComputeTaskO>>
@@ -217,7 +217,9 @@ struct ProductState : TaskType<2, ATile, BTile, std::tuple<ATilePtr, BTilePtr, P
     }
 };// }}}
 
-struct SumState : TaskType<2, CTile, PTile, std::tuple<PTilePtr, CTilePtr>, CTile> {// {{{
+#define SumStateIn CTile, PTile, std::pair<PTilePtr, CTilePtr>
+#define SumStateOut std::pair<PTilePtr, CTilePtr>, CTile
+struct SumState : TaskType<3, SumStateIn, SumStateOut> {// {{{
     size_t TM, TN, TK;
     size_t count;
     std::vector<std::vector<PTilePtr>> sum_queues;
@@ -232,8 +234,7 @@ struct SumState : TaskType<2, CTile, PTile, std::tuple<PTilePtr, CTilePtr>, CTil
         if (sum_queues[c_idx].size() > 0) {
             auto p = sum_queues[c_idx].back();
             sum_queues[c_idx].pop_back();
-            this->count -= 1;
-            this->addResult(std::make_shared<std::tuple<PTilePtr, CTilePtr>>(p, tile));
+            this->addResult(std::make_shared<std::pair<PTilePtr, CTilePtr>>(p, tile));
         } else {
             C_tiles[c_idx] = tile;
         }
@@ -244,11 +245,21 @@ struct SumState : TaskType<2, CTile, PTile, std::tuple<PTilePtr, CTilePtr>, CTil
         if (C_tiles[c_idx] != nullptr) {
             auto c = C_tiles[c_idx];
             C_tiles[c_idx] = nullptr;
-            this->count -= 1;
-            this->addResult(std::make_shared<std::tuple<PTilePtr, CTilePtr>>(tile, c));
+            this->addResult(std::make_shared<std::pair<PTilePtr, CTilePtr>>(tile, c));
         } else {
             sum_queues[c_idx].push_back(tile);
         }
+    }
+
+    void execute(std::shared_ptr<std::pair<PTilePtr, CTilePtr>> tiles) override {
+        auto c = tiles->second;
+        this->count -= 1;
+        if (this->count == 0) {
+            printf("result\n");
+            this->addResult(c);
+            return;
+        }
+        execute(c);
     }
 
     bool canTerminate() const override {
@@ -261,8 +272,8 @@ struct DgemmGraph : hh::Graph<3, AMat, BMat, CMat, CTile> {
         size_t TM = M / tile_size + (M % tile_size == 0 ? 0 : 1);
         size_t TN = N / tile_size + (N % tile_size == 0 ? 0 : 1);
         size_t TK = K / tile_size + (K % tile_size == 0 ? 0 : 1);
-        build_with_splitted_tasks(TM, TN, TK, tile_size);
-        // build_with_compute_task(TM, TN, TK, tile_size);
+        // build_with_splitted_tasks(TM, TN, TK, tile_size);
+        build_with_compute_task(TM, TN, TK, tile_size);
     }
 
     void build_with_compute_task(size_t TM, size_t TN, size_t TK, size_t tile_size) {

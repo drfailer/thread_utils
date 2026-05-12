@@ -289,13 +289,12 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     // tu_u64 product_state_group = state_group;
     // tu_u64 sum_state_group = state_group;
 
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 4, 32);
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 42, 32, 32);
     tu_u64 split_group = group;
     tu_u64 product_group = group;
     tu_u64 sum_group = group;
     tu_u64 product_state_group = group;
     tu_u64 sum_state_group = group;
-
 
     printf("create dfg graph...\n");
     TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
@@ -424,9 +423,9 @@ int main(int, char **) {
     // matrix_init_double(A);
     // matrix_init_double(B);
 
-    // printf("compute ground truth...\n");
-    // matmul(A, B, E);
-    // matrix_print(E);
+    printf("compute ground truth...\n");
+    matmul(A, B, E);
+    matrix_print(E);
 
     openblas_set_num_threads(1);
 

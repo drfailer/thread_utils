@@ -27,19 +27,16 @@ struct TU_GraphExecNodeInput {
 };
 
 struct TU_GraphExecNodeOutput {
-    TU_GraphNode *node = nullptr;
-    TU_GraphNodeQueue *queue = nullptr;
+    TU_Set<TU_GraphNode *> nodes = {};
+    TU_Set<TU_GraphNodeQueue *> queues = {};
 };
-
-// required for set
-bool operator<(TU_GraphExecNodeOutput const &lhs, TU_GraphExecNodeOutput const &rhs);
 
 // This struct is called base, but it is also a behavior (nodes that have this
 // field to null don't implement the behavior, it is more flexible than a
 // base).
 struct TU_GraphExecNodeBase {
     TU_Map<TU_TypeId, TU_GraphExecNodeInput> inputs = {};
-    TU_Map<TU_TypeId, TU_Set<TU_GraphExecNodeOutput>> outputs = {};
+    TU_Map<TU_TypeId, TU_GraphExecNodeOutput> outputs = {};
     TU_GraphSink *sink = nullptr;
     tu_u64 group = 0;
     tu_u64 max_thread_count = 0;

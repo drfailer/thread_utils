@@ -133,8 +133,8 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
                 fs << ADDR(node) << " -> " << edge << ";" << std::endl;
-                for (auto &output : output) {
-                    fs << edge << " -> " << ADDR(output.node) << ";" << std::endl;
+                for (auto node : output.nodes) {
+                    fs << edge << " -> " << ADDR(node) << ";" << std::endl;
                 }
             }
         } break;

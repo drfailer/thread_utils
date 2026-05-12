@@ -4,10 +4,6 @@
 
 // TODO(LOGGER): printf should be replaced with a configurable logger.
 
-bool operator<(TU_GraphExecNodeOutput const &lhs, TU_GraphExecNodeOutput const &rhs) {
-    return lhs.node < rhs.node;
-}
-
 static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types,
                                             TU_Set<TU_TypeId> const &output_types,
                                             tu_u64 group, tu_u64 max_thread_count) {
@@ -16,7 +12,7 @@ static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types
         b_exec->inputs.insert({type, TU_GraphExecNodeInput{}});
     }
     for (TU_TypeId type : output_types) {
-        b_exec->outputs.insert({type, TU_Set<TU_GraphExecNodeOutput>{}});
+        b_exec->outputs.insert({type, TU_GraphExecNodeOutput{}});
     }
     b_exec->sink = nullptr;
     b_exec->group = group;
@@ -105,7 +101,7 @@ bool tu_graph_check(TU_Graph *graph) {
                 }
             }
             for (auto &[type, output] : node->b_exec->outputs) {
-                if (output.empty() && node->b_exec->sink == nullptr) {
+                if (output.nodes.empty() && node->b_exec->sink == nullptr) {
                     printf("[TU_WARN]: node `%s' doesn't have successor for type `%ld'.\n",
                            node->name, type);
                 }
@@ -337,10 +333,8 @@ bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
                sender->name, receiver->name, type);
         return false;
     }
-    sender_output->second.insert(TU_GraphExecNodeOutput{
-        .node = receiver,
-        .queue = &receiver_input->second.queue,
-    });
+    sender_output->second.nodes.insert(receiver);
+    sender_output->second.queues.insert(&receiver_input->second.queue);
     return true;
 }
 
@@ -377,10 +371,8 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     for (auto &[type, receiver_input] : receiver->b_exec->inputs) {
         auto sender_output = sender->b_exec->outputs.find(type);
         if (sender_output != sender->b_exec->outputs.end()) {
-            sender_output->second.insert(TU_GraphExecNodeOutput{
-                .node = receiver,
-                .queue = &receiver_input.queue
-            });
+            sender_output->second.nodes.insert(receiver);
+            sender_output->second.queues.insert(&receiver_input.queue);
         }
     }
     return true;
@@ -431,9 +423,11 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
         }
         return;
     }
-    for (auto &output : output->second) {
-        output.queue->push(data);
-        tu_internal_node_notify_workers(&exec_ctx->dfg_ctx, output.node);
+    for (auto queue : output->second.queues) {
+        queue->push(data);
+    }
+    for (auto node : output->second.nodes) {
+        tu_internal_node_notify_workers(&exec_ctx->dfg_ctx, node);
     }
     tu_internal_result_end(node->b_exec, &sw);
 }

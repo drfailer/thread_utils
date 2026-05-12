@@ -9,8 +9,8 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M_SIZE = 10000;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 1024;
+constexpr size_t M_SIZE = 20000;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 2048;
 #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -275,21 +275,21 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
 
-    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0, 0);
-    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0, 0);
-    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0, 0);
-    // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 0);
-    // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 0);
+    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0);
+    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0);
+    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0);
+    // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
+    // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
 
-    // tu_u64 task_group = tu_dfg_add_worker_group(&dfg, 40, 128, 32);
-    // tu_u64 state_group = tu_dfg_add_worker_group(&dfg, 1, 0, 32);
+    // tu_u64 task_group = tu_dfg_add_worker_group(&dfg, 40, 128);
+    // tu_u64 state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
     // tu_u64 split_group = task_group;
     // tu_u64 product_group = task_group;
     // tu_u64 sum_group = task_group;
     // tu_u64 product_state_group = state_group;
     // tu_u64 sum_state_group = state_group;
 
-    tu_u64 group = tu_dfg_add_worker_group(&dfg, 42, 32, 32);
+    tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 8);
     tu_u64 split_group = group;
     tu_u64 product_group = group;
     tu_u64 sum_group = group;

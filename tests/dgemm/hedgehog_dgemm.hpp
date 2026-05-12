@@ -272,8 +272,8 @@ struct DgemmGraph : hh::Graph<3, AMat, BMat, CMat, CTile> {
         size_t TM = M / tile_size + (M % tile_size == 0 ? 0 : 1);
         size_t TN = N / tile_size + (N % tile_size == 0 ? 0 : 1);
         size_t TK = K / tile_size + (K % tile_size == 0 ? 0 : 1);
-        // build_with_splitted_tasks(TM, TN, TK, tile_size);
-        build_with_compute_task(TM, TN, TK, tile_size);
+        build_with_splitted_tasks(TM, TN, TK, tile_size);
+        // build_with_compute_task(TM, TN, TK, tile_size);
     }
 
     void build_with_compute_task(size_t TM, size_t TN, size_t TK, size_t tile_size) {

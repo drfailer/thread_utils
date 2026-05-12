@@ -15,7 +15,6 @@ struct TU_DfgWorker {
     TU_DfgWorkerGroup *group = nullptr;
     tu_u64 id = 0;
     tu_u64 process_count = 0;
-    TU_CacheQueue<TU_GraphOperation> cache = {};
     TU_DfgWorkerProfileInfos prof_infos = {};
     alignas(CACHE_LINE) TU_AtomicFlag parked = true;
     alignas(CACHE_LINE) TU_AtomicFlag can_terminate = false;
@@ -26,7 +25,6 @@ struct TU_DfgWorker {
     TU_DfgWorker(TU_DfgWorker &&other)
         : thread(std::move(other.thread)), group(other.group), id(other.id),
           process_count(other.process_count),
-          cache(std::move(other.cache)),
           prof_infos(other.prof_infos),
           parked(other.parked.load()),
           can_terminate(other.can_terminate.load()) {}
@@ -37,7 +35,6 @@ struct TU_DfgWorkerGroup {
     TU_Array<TU_DfgWorker> workers = {};
     TU_Dfg *dfg = nullptr;
     tu_u64 id = 0;
-    size_t workers_cache_size = 0;
     size_t max_dequeue_count = 0;
     TU_Array<TU_GraphNode *> nodes = {};
 };
@@ -68,7 +65,7 @@ struct TU_Dfg {
 TU_Dfg tu_dfg_create();
 void tu_dfg_destroy(TU_Dfg *dfg);
 
-tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count, size_t cache_size);
+tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count);
 
 void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph);
 void tu_dfg_clear(TU_Dfg *dfg);

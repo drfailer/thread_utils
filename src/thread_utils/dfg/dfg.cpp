@@ -17,7 +17,7 @@ void tu_dfg_destroy(TU_Dfg *dfg) {
     dfg->groups.clear();
 }
 
-tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count, size_t cache_size) {
+tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count) {
     if (!ptr_arg_check(dfg)) return 0;
     assert(thread_count > 0);
     TU_DfgWorkerGroup *group = new TU_DfgWorkerGroup();
@@ -25,14 +25,10 @@ tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequ
     group->dfg = dfg;
     group->workers = std::vector<TU_DfgWorker>(thread_count);
     group->max_dequeue_count = max_dequeue_count;
-    group->workers_cache_size = cache_size;
     size_t worker_id = 0;
     for (auto &worker : group->workers) {
         worker.group = group;
         worker.id = worker_id++;
-        if (cache_size > 0) {
-            worker.cache = TU_CacheQueue<TU_GraphOperation>(cache_size);
-        }
     }
     dfg->groups.push_back(group);
     return group->id;
@@ -177,12 +173,6 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     worker->process_count += 1;
 }
 
-static void worker_process_cache(TU_DfgWorker *worker) {
-    for (TU_GraphOperation op = {}; worker->cache.pop(&op);) {
-        worker_node_exec(worker, op.node, &op.data);
-    }
-}
-
 // For tasks, workers try to dequeue up to a user specified amount of data to
 // process before moving to the next node.
 static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
@@ -202,7 +192,6 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
         }
         worker_node_exec(worker, node, &data);
     }
-    worker_process_cache(worker);
 }
 
 // States are processed by only one worker at a time. Once a worker has taken

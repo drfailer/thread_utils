@@ -202,7 +202,6 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
         fs << "<tr><td bgcolor=\"lightgray\" rowspan=\"" << worker_count
            << "\">group: " << group->id << "<br/>"
            << "worker count = " << worker_count << "<br/>"
-           << "cache size = " << group->workers_cache_size << "<br/>"
            << "dequeue count = " << group->max_dequeue_count << "<br/>"
            << "</td>";
         for (size_t i = 0; i < worker_count; ++i) {

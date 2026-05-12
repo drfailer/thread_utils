@@ -166,9 +166,9 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
         },
     };
     tu_internal_exec_start(node->b_exec, &sw);
-    auto exec_it = node->b_exec->execs.find(data->type);
-    assert(exec_it != node->b_exec->execs.end());
-    exec_it->second(&exec_ctx, data->data, data->type);
+    auto input = node->b_exec->inputs.find(data->type);
+    assert(input != node->b_exec->inputs.end());
+    input->second.exec(&exec_ctx, data->data, data->type);
     tu_internal_exec_end(node->b_exec, &sw);
     // worker profiling
     auto &prof = worker->prof_infos.exec_dur[node];

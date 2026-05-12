@@ -65,9 +65,9 @@ static std::string get_exec_node_label(TU_GraphNode *node) {
     dot_table_begin(oss);
     oss << "<tr><td colspan=\"2\">" << node->name << " x" << node->b_exec->max_thread_count
         << "</td></tr>" << sep;
-    for (auto &[type, queue] : node->b_exec->queues) {
-        if constexpr (requires { queue.prof_str(); }) {
-            oss << "<tr><td>queue[" << type << "]</td><td>" << queue.prof_str() << "</td></tr>" << sep;
+    for (auto &[type, input] : node->b_exec->inputs) {
+        if constexpr (requires { input.queue.prof_str(); }) {
+            oss << "<tr><td>queue[" << type << "]</td><td>" << input.queue.prof_str() << "</td></tr>" << sep;
         }
     }
     oss << "<tr><td colspan=\"2\">" << node->b_exec->prof_infos.prof_str() << "</td></tr>";
@@ -129,12 +129,12 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
             std::string color = get_node_color(node, exec_time);
             fs << ADDR(node) << " [label=<" << get_exec_node_label(node)
                 << ">,shape=rect,color=\"" << color << "\",penwidth=3];" << std::endl;
-            for (auto &[type, successors] : node->b_exec->successors) {
+            for (auto &[type, output] : node->b_exec->outputs) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
                 fs << ADDR(node) << " -> " << edge << ";" << std::endl;
-                for (TU_GraphNode *successor : successors) {
-                    fs << edge << " -> " << ADDR(successor) << ";" << std::endl;
+                for (auto &output : output) {
+                    fs << edge << " -> " << ADDR(output.node) << ";" << std::endl;
                 }
             }
         } break;

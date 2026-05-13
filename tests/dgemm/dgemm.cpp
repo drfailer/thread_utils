@@ -271,13 +271,15 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     size_t TN = C.cols / TILE_SIZE + (C.cols % TILE_SIZE == 0 ? 0 : 1);
     size_t TK = A.cols / TILE_SIZE + (A.cols % TILE_SIZE == 0 ? 0 : 1);
 
+    printf("\ndfg dgemm...\n");
+
     timer_start(dgemm_dfg);
     TU_Dfg dfg = tu_dfg_create();
     defer(tu_dfg_destroy(&dfg));
 
-    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 0);
-    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 0);
-    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 0);
+    // tu_u64 split_group = tu_dfg_add_worker_group(&dfg, 3, 1);
+    // tu_u64 product_group = tu_dfg_add_worker_group(&dfg, 40, 32);
+    // tu_u64 sum_group = tu_dfg_add_worker_group(&dfg, 10, 128);
     // tu_u64 product_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
     // tu_u64 sum_state_group = tu_dfg_add_worker_group(&dfg, 1, 0);
 
@@ -296,11 +298,8 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_u64 product_state_group = group;
     tu_u64 sum_state_group = group;
 
-    printf("create dfg graph...\n");
     TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
-    // defer(tu_graph_destroy(&graph));
-
-    printf("build dfg graph...\n");
+    defer(tu_graph_destroy(&graph));
 
     SplitTaskData split_task_data{
         .tile_size = TILE_SIZE,
@@ -363,14 +362,12 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     tu_graph_check(&graph);
 
-    printf("run dfg graph...\n");
     tu_dfg_set_graph(&dfg, &graph);
     tu_dfg_exec(&dfg);
     tu_dfg_push_data(&dfg, &A, T_MatrixA);
     tu_dfg_push_data(&dfg, &B, T_MatrixB);
     tu_dfg_push_data(&dfg, &C, T_MatrixC);
     tu_dfg_wait_result(&dfg); // only one result before termination
-    printf("stop dfg...\n");
     tu_dfg_term(&dfg);
     timer_end(dgemm_dfg);
     timer_report(dgemm_dfg);

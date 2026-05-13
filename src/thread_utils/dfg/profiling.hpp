@@ -79,14 +79,19 @@ struct TU_DfgWorkerProfileInfos {
 
 struct TU_DfgProfileInfos {
     TU_Duration creation_time;
+    TU_Duration shutdown_time;
     TU_Duration execution_time;
-    TU_Stopwatch sw;
+    TU_Stopwatch sw, shutdown_sw;
 
     // this profile information are always enabled because they don't alter the
     // execution of the graph
 
     void create_begin() { tu_stopwatch_start(&this->sw); }
     void create_end() { this->creation_time = tu_stopwatch_stop_and_get_time(&this->sw); }
+
+    void shutdown_begin() { tu_stopwatch_start(&this->shutdown_sw); }
+    void shutdown_end() { this->shutdown_time = tu_stopwatch_stop_and_get_time(&this->shutdown_sw); }
+
     void execute_begin() { tu_stopwatch_start(&this->sw); }
     void execute_end() { this->execution_time = tu_stopwatch_stop_and_get_time(&this->sw); }
 };

@@ -203,6 +203,7 @@ void tu_graph_print_to_dot(TU_Dfg *dfg, const char *filename) {
     fs << "label=\"" << dfg->graph->name
        << "\\n Creation time: " << tu_duration_to_string(dfg->prof_infos.creation_time)
        << "\\n Execution time: " << tu_duration_to_string(dfg->prof_infos.execution_time)
+       << "\\n Shutdown time: " << tu_duration_to_string(dfg->prof_infos.shutdown_time)
        << "\";" << std::endl;
     // TODO: execution and creation times
     graph_print_runner_infos(dfg, fs);

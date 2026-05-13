@@ -91,6 +91,7 @@ void tu_dfg_exec(TU_Dfg *dfg) {
 
 void tu_dfg_term(TU_Dfg *dfg) {
     assert(dfg->graph != nullptr);
+    dfg->prof_infos.shutdown_begin();
     for (auto group : dfg->groups) {
         for (auto &worker : group->workers) {
             worker.can_terminate.store(true);
@@ -100,6 +101,7 @@ void tu_dfg_term(TU_Dfg *dfg) {
             worker_stop(&worker);
         }
     }
+    dfg->prof_infos.shutdown_end();
     dfg->prof_infos.execute_end();
 }
 

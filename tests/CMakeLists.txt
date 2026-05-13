@@ -19,3 +19,8 @@ target_link_libraries(dgemm PRIVATE thread_utils openblas ${TBB} atomic)
 
 add_executable(hadamard hadamard/hadamard.cpp common/matrix.cpp)
 target_link_libraries(hadamard PRIVATE thread_utils atomic)
+
+add_definitions(-DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
+find_package(MPI REQUIRED)
+add_executable(test_mpi mpi/main.cpp)
+target_link_libraries(test_mpi PRIVATE mpi ucp thread_utils atomic)

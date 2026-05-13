@@ -29,7 +29,8 @@ struct TU_GraphOperation {
     TU_GraphNode *node;
 };
 
-using TU_GraphNodeQueueImpl = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
+// using TU_GraphNodeQueueImpl = TU_FiniteOverflowQueue<TU_GraphData, 1024>;
+using TU_GraphNodeQueueImpl = TU_LockQueue<TU_GraphData>;
 using TU_GraphNodeQueue = TU_ProfiledQueue<TU_GraphNodeQueueImpl>;
 
 struct TU_DfgContext {

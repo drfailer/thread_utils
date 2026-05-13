@@ -10,6 +10,7 @@
 #include "profiling.hpp"
 
 enum TU_GraphNodeKind {
+    // TODO: merge task and state into executable node
     TU_GRAPH_NODE_KIND_TASK,
     TU_GRAPH_NODE_KIND_STATE,
     TU_GRAPH_NODE_KIND_GRAPH,
@@ -40,10 +41,12 @@ struct TU_GraphExecNodeBase {
     TU_GraphSink *sink = nullptr;
     tu_u64 group = 0;
     tu_u64 max_thread_count = 0;
+    // TODO: try to replace this with a semaphore
     alignas(64) TU_Atomic<size_t> thread_count = 0;
     TU_GraphExecNodeBaseProfileInfos prof_infos;
 };
 
+// TODO: move this to exec base
 struct TU_GraphTask {
     void *data = nullptr;
 };

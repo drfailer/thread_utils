@@ -26,7 +26,7 @@ TU_LockQueue<T>::TU_LockQueue(TU_LockQueue &&other)
 
 template <typename T>
 TU_LockQueue<T> &TU_LockQueue<T>::operator=(TU_LockQueue &&other) {
-    this->datas = std::move(other.data);
+    this->data = std::move(other.data);
     return *this;
 }
 

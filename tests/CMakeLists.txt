@@ -22,5 +22,5 @@ target_link_libraries(hadamard PRIVATE thread_utils atomic)
 
 add_definitions(-DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX)
 find_package(MPI REQUIRED)
-add_executable(test_mpi mpi/main.cpp)
-target_link_libraries(test_mpi PRIVATE mpi ucp thread_utils atomic)
+add_executable(test_mpi mpi/main.cpp mpi/comm_task.cpp)
+target_link_libraries(test_mpi PRIVATE mpi ucp ucs thread_utils atomic)

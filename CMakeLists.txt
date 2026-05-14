@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_VERBOSE_MAKEFILE TRUE)
 
-add_compile_options(-Wall -Wextra -Wuninitialized -O3)
+add_compile_options(-Wall -Wextra -Wuninitialized -g)
 # add_compile_options(-Wall -Wextra -Wuninitialized -DNDEBUG -O3)
 
 # Library sources (exclude main.cpp)

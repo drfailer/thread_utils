@@ -33,13 +33,21 @@ struct TU_GraphExecNodeBaseProfileInfos {
 
     std::string prof_str() {
         std::ostringstream oss;
-        std::string exec_avg = tu_duration_to_string(TU_Duration(exec_dur.load() / exec_count.load()));
-        std::string exec_ttl = tu_duration_to_string(TU_Duration(exec_dur / worker_count));
-        std::string result_avg = tu_duration_to_string(TU_Duration(result_dur.load() / result_count.load()));
-        std::string result_ttl = tu_duration_to_string(TU_Duration(result_dur / worker_count));
+        size_t exec_count_ = exec_count.load();
+        TU_Duration exec_avg = TU_Duration(exec_count_ > 0 ? exec_dur.load() / exec_count_ : 0);
+        TU_Duration exec_ttl = TU_Duration(worker_count > 0 ? exec_dur.load() / worker_count : 0);
+        std::string exec_avg_str = tu_duration_to_string(exec_avg);
+        std::string exec_ttl_str = tu_duration_to_string(exec_ttl);
+
+        size_t result_count_ = result_count.load();
+        TU_Duration result_avg = TU_Duration(result_count_ > 0 ? result_dur.load() / result_count_ : 0);
+        TU_Duration result_ttl = TU_Duration(worker_count > 0 ? result_dur.load() / worker_count : 0);
+        std::string result_avg_str = tu_duration_to_string(result_avg);
+        std::string result_ttl_str = tu_duration_to_string(result_ttl);
+
         oss << "<table border=\"0\" cellborder=\"1\" cellspacing=\"0\" cellpadding=\"5\">\n";
-        oss << "<tr><td>exec:</td><td>" << exec_avg << " / " << exec_ttl << "</td><td>" << exec_count.load() << "</td></tr>\n";
-        oss << "<tr><td>result:</td><td>" << result_avg << " / " << result_ttl << "</td><td>" << result_count.load() << "</td></tr>\n";
+        oss << "<tr><td>exec:</td><td>" << exec_avg_str << " / " << exec_ttl_str << "</td><td>" << exec_count_ << "</td></tr>\n";
+        oss << "<tr><td>result:</td><td>" << result_avg_str << " / " << result_ttl_str << "</td><td>" << result_count_ << "</td></tr>\n";
         oss << "</table>\n";
         return oss.str();
     }

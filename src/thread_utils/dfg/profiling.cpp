@@ -85,9 +85,10 @@ static std::string get_node_color(TU_GraphNode *node, TU_Duration exec_time) {
     std::string color = "#000000";
     auto exec_dur = node->b_exec->prof_infos.exec_dur.load();
     auto worker_count = node->b_exec->prof_infos.worker_count;
-    auto exec_ttl = TU_Duration(exec_dur / worker_count);
+    auto exec_ttl = TU_Duration(worker_count > 0 ? exec_dur / worker_count : 0);
     // stollen from Hedgehog:
-    auto posRedToBlue = (uint64_t) std::round((double) exec_ttl.count() / (double) exec_time.count() * 255);
+    double avg_time = exec_time.count() > 0 ? (double) exec_ttl.count() / (double) exec_time.count() : 0;
+    auto posRedToBlue = (uint64_t) std::round(avg_time * 255);
     posRedToBlue = std::clamp(posRedToBlue, (uint64_t) 0, (uint64_t) 255);
     std::stringstream ss;
     ss << "#"
@@ -138,9 +139,9 @@ static void graph_print_worker_infos(TU_DfgWorker const &worker, std::ofstream &
         auto node_ttl_exec = node->b_exec->prof_infos.exec_dur.load();
         auto ttl_exec = infos.first;
         TU_Duration avg_exec = {};
-        double percent_exec = 100 * ((double)ttl_exec.count() / (double)node_ttl_exec);
+        double percent_exec = 100 * (node_ttl_exec > 0 ? (double)ttl_exec.count() / (double)node_ttl_exec : 0);
         if (infos.second > 0) {
-            avg_exec = TU_Duration(ttl_exec.count() / infos.second);
+            avg_exec = TU_Duration(infos.second > 0 ? ttl_exec.count() / infos.second : 0);
             // TODO: it is not great to modify the profile infos here
             node->b_exec->prof_infos.worker_count += 1;
         }
@@ -166,7 +167,7 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
         for (auto node : group->nodes) {
             size_t count = node->b_exec->prof_infos.exec_count.load();
             size_t dur = node->b_exec->prof_infos.exec_dur.load();
-            std::string node_exec_avg = tu_duration_to_string(TU_Duration(dur / count));
+            std::string node_exec_avg = tu_duration_to_string(TU_Duration(count > 0 ? dur / count : 0));
             std::string node_exec_ttl = tu_duration_to_string(TU_Duration(dur));
             fs << "<td bgcolor=\"lightgray\">" << node->name
                << " (" << node_exec_avg << " / " << node_exec_ttl << " - " << count << ")"

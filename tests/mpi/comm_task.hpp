@@ -26,18 +26,19 @@ struct TU_UcxAMHeader {
     tu_i64 type;
 };
 
-struct TU_Package {
+struct TU_CommPackage {
     void  *data;
     size_t size;
     tu_i64 type;
     tu_u64 dest;
+    // TODO: remove this
     void *on_send_data;
-    void (*on_send)(TU_Package *);
+    void (*on_send)(TU_CommPackage *);
 };
 
 struct TU_CommTaskData {
     TU_UcxContext ucx;
-    TU_LockQueue<TU_Package> package_queue; // this has to be thread safe because other threads will push to it
+    TU_LockQueue<TU_CommPackage> package_queue; // this has to be thread safe because other threads will push to it
     TU_CommQueue<TU_UcxAMRndvData> rndv_queue;
     TU_CommBufferPool buffer_pool; // buffer pool for eager
     // progress thread data
@@ -47,6 +48,9 @@ struct TU_CommTaskData {
     TU_Dfg *dfg;
     TU_GraphNode *node;
     TU_Map<TU_TypeId, TU_NodeExec> recv_exec; // we need to call those manually to recompute the type
+
+    // TODO: we need request queues to avoid waiting
+    // TODO: we need a storage to enable splitting the
 };
 
 TU_GraphNode *tu_comm_task(TU_Dfg *dfg, TU_Graph *graph, const char *name, TU_CommTaskData *data, TU_Set<TU_TypeId> const &types, tu_u64 dfg_group);
@@ -54,7 +58,10 @@ TU_GraphNode *tu_comm_task(TU_Dfg *dfg, TU_Graph *graph, const char *name, TU_Co
 // TODO: this is tmp
 void tu_comm_task_destroy(TU_CommTaskData *comm);
 
-void tu_comm_send(TU_ExecContext *ctx, TU_Package package);
+// TODO: the dest should be outside of the package
+// TODO: the package should be composed of several buffers, and we need a way to
+//       express that.
+void tu_comm_send(TU_ExecContext *ctx, TU_CommPackage package);
 
 bool tu_comm_send_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec);
 bool tu_comm_recv_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec);

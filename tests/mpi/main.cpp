@@ -56,13 +56,13 @@ void test_graph(uint32_t rank) {
     tu_comm_send_exec(scatter_task, 1, [](TU_ExecContext *ctx, void *data, tu_i64 type) {
         printf("scatter send.\n");
         // inter-node
-        tu_comm_send(ctx, TU_Package{
+        tu_comm_send(ctx, TU_CommPackage{
             .data = data,
             .size = sizeof(int),
             .type = type,
             .dest = 1,
             .on_send_data = nullptr,
-            .on_send = [](TU_Package *) {
+            .on_send = [](TU_CommPackage *) {
                 printf("on send (scatter)\n");
             },
         });
@@ -77,13 +77,13 @@ void test_graph(uint32_t rank) {
         auto comm = (TU_CommTaskData*)tu_node_data(ctx);
         printf("gather send.\n");
         // inter-node
-        tu_comm_send(ctx, TU_Package{
+        tu_comm_send(ctx, TU_CommPackage{
             .data = data,
             .size = sizeof(int),
             .type = type,
             .dest = 0,
             .on_send_data = comm,
-            .on_send = [](TU_Package *) {
+            .on_send = [](TU_CommPackage *) {
                 printf("on send (gather)\n");
             },
         });

@@ -116,7 +116,7 @@ bool tu_comm_recv_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec) {
 }
 
 // used in the user exec
-void tu_comm_send(TU_ExecContext *ctx, TU_Package package) {
+void tu_comm_send(TU_ExecContext *ctx, TU_CommPackage package) {
     auto comm = (TU_CommTaskData*)tu_node_data(ctx);
     comm->package_queue.push(std::move(package));
     ucp_worker_signal(comm->ucx.worker);
@@ -176,7 +176,7 @@ static void process_recv_ops(TU_CommTaskData *comm) {
 }
 
 static void process_send_ops(TU_CommTaskData *comm) {
-    TU_Package package;
+    TU_CommPackage package;
     while (comm->package_queue.pop(&package)) {
         TU_UcxAMHeader header = {
             .type = package.type,

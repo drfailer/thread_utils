@@ -217,19 +217,22 @@ static void worker_process_queues(TU_DfgWorker *worker) {
         assert(node_idx < worker->group->nodes.size());
         TU_GraphNode *node = worker->group->nodes[node_idx];
 
-        // Each nodes has a maximum number of workers that can process its
-        // queue at the same time
-        if (node->b_exec->thread_count.fetch_add(1) < node->b_exec->max_thread_count) {
-            switch (node->kind) {
-            case TU_GRAPH_NODE_KIND_STATE: worker_process_state_queue(worker, node); break;
-            case TU_GRAPH_NODE_KIND_TASK: worker_process_task_queue(worker, node); break;
-            default: assert(false && "we shouldn't arrive here"); break;
+        // use load preemptively because fetch_add is expensive
+        if (node->b_exec->thread_count.load() < node->b_exec->max_thread_count) {
+            // Each nodes has a maximum number of workers that can process its
+            // queue at the same time
+            if (node->b_exec->thread_count.fetch_add(1) < node->b_exec->max_thread_count) {
+                switch (node->kind) {
+                case TU_GRAPH_NODE_KIND_STATE: worker_process_state_queue(worker, node); break;
+                case TU_GRAPH_NODE_KIND_TASK: worker_process_task_queue(worker, node); break;
+                default: assert(false && "we shouldn't arrive here"); break;
+                }
             }
+            node->b_exec->thread_count -= 1;
         }
 
         // when the node count is reach, we restart, unless all the queues are empty
         node_idx += 1;
-        node->b_exec->thread_count -= 1;
         if (node_idx >= node_count) {
             if (worker->process_count == 0) {
                 return;

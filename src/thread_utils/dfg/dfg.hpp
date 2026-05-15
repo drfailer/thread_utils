@@ -9,6 +9,7 @@
 #include "../common.hpp"
 #include "decl.hpp"
 #include "graph.hpp"
+#include "type.hpp"
 
 struct TU_DfgWorker {
     TU_Thread thread;
@@ -45,6 +46,7 @@ struct TU_Dfg {
     TU_Cond cond;
     TU_Array<TU_DfgWorkerGroup *> groups = {};
     TU_Graph *graph = nullptr;
+    TU_TypeRegistry type_registry;
     TU_DfgProfileInfos prof_infos = {};
 
     // constructors

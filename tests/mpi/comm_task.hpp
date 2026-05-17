@@ -46,14 +46,14 @@ struct TU_CommTaskData {
     alignas(CACHE_LINE) TU_AtomicFlag can_terminate = false;
     // needed for transmitting results to the other nodes upon recv
     TU_Dfg *dfg;
-    TU_GraphNode *node;
+    Node *node;
     TU_Map<TU_TypeId, TU_NodeExec> recv_exec; // we need to call those manually to recompute the type
 
     // TODO: we need request queues to avoid waiting
     // TODO: we need a storage to enable splitting the
 };
 
-TU_GraphNode *tu_comm_task(TU_Dfg *dfg, TU_Graph *graph, const char *name, TU_CommTaskData *data, TU_Set<TU_TypeId> const &types, tu_u64 dfg_group);
+Node *tu_comm_task(TU_Dfg *dfg, Graph *graph, const char *name, TU_CommTaskData *data, TU_Set<TU_TypeId> const &types, tu_u64 dfg_group);
 
 // TODO: this is tmp
 void tu_comm_task_destroy(TU_CommTaskData *comm);
@@ -63,7 +63,7 @@ void tu_comm_task_destroy(TU_CommTaskData *comm);
 //       express that.
 void tu_comm_send(TU_ExecContext *ctx, TU_CommPackage package);
 
-bool tu_comm_send_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec);
-bool tu_comm_recv_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec);
+bool tu_comm_send_exec(Node *task, TU_TypeId type, TU_NodeExec exec);
+bool tu_comm_recv_exec(Node *task, TU_TypeId type, TU_NodeExec exec);
 
 #endif

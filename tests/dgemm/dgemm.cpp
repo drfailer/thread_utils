@@ -300,7 +300,7 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_u64 product_state_group = group;
     tu_u64 sum_state_group = group;
 
-    TU_Graph *graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
+    Graph *graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
     defer(tu_graph_destroy(graph));
 
     SplitTaskData split_task_data{

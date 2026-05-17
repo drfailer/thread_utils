@@ -17,21 +17,21 @@ void test_graph(uint32_t rank) {
     tu_u64 compute_group = tu_dfg_add_worker_group(&dfg, 10, 16);
     tu_u64 comm_group = tu_dfg_add_worker_group(&dfg, 1, 1);
 
-    TU_Graph graph = tu_graph_create("comm_graph", {1}, {1});
+    Graph graph = tu_graph_create("comm_graph", {1}, {1});
     defer(tu_graph_destroy(&graph));
 
     TU_CommTaskData comm_scatter = {};
-    TU_GraphNode *scatter_task = tu_comm_task(&dfg, &graph, "comm_scatter", &comm_scatter, {1}, comm_group);
+    Node *scatter_task = tu_comm_task(&dfg, &graph, "comm_scatter", &comm_scatter, {1}, comm_group);
     assert(scatter_task != nullptr);
     defer(tu_comm_task_destroy(&comm_scatter));
     TU_CommTaskData comm_gather = {};
-    TU_GraphNode *gather_task = tu_comm_task(&dfg, &graph, "comm_gather", &comm_gather, {1}, comm_group);
+    Node *gather_task = tu_comm_task(&dfg, &graph, "comm_gather", &comm_gather, {1}, comm_group);
     assert(gather_task != nullptr);
     defer(tu_comm_task_destroy(&comm_gather));
 
-    TU_GraphNode *init_task    = tu_task(&graph, "init", nullptr, {1}, {1}, compute_group, 40);
-    TU_GraphNode *compute_task = tu_task(&graph, "compute", nullptr, {1}, {1}, compute_group, 40);
-    TU_GraphNode *fini_task    = tu_task(&graph, "fini", nullptr, {1}, {1}, compute_group, 40);
+    Node *init_task    = tu_task(&graph, "init", nullptr, {1}, {1}, compute_group, 40);
+    Node *compute_task = tu_task(&graph, "compute", nullptr, {1}, {1}, compute_group, 40);
+    Node *fini_task    = tu_task(&graph, "fini", nullptr, {1}, {1}, compute_group, 40);
 
     // normal nodes
     tu_exec(init_task, 1, [](TU_ExecContext *ctx, void *data, tu_i64 type) {

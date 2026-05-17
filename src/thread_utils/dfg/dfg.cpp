@@ -42,10 +42,10 @@ void tu_dfg_clear(TU_Dfg *dfg) {
     }
 }
 
-static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
-    for (TU_GraphNode *node : graph->nodes) {
+static void dfg_register_nodes(TU_Dfg *dfg, Graph *graph) {
+    for (Node *node : graph->nodes) {
         if (node->kind != NODE_KIND_GRAPH) {
-            auto exec_node = (TU_GraphExecNodeBase*)node;
+            auto exec_node = (ExecNode*)node;
             if (exec_node->group >= dfg->groups.size()) {
                 printf("[TU_ERROR]: cannot register node `%s' group `%ld' in dfg.\n",
                        node->name, exec_node->group);
@@ -57,12 +57,12 @@ static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
                 worker.prof_infos.exec_dur[node] = {};
             }
         } else if (node->kind == NODE_KIND_GRAPH) {
-            dfg_register_nodes(dfg, (TU_Graph*)graph);
+            dfg_register_nodes(dfg, (Graph*)graph);
         }
     }
 }
 
-void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph) {
+void tu_dfg_set_graph(TU_Dfg *dfg, Graph *graph) {
     if (!ptr_arg_check(dfg)) return;
     if (!ptr_arg_check(graph)) return;
     if (dfg->graph != nullptr && dfg->graph != graph) {
@@ -113,14 +113,14 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
                dfg->graph->node.name, type);
         return;
     }
-    TU_GraphData data{ptr, type};
+    GraphData data{ptr, type};
     TU_DfgContext dfg_ctx = {
         .dfg = dfg,
         .group = nullptr,
         .worker = nullptr,
     };
     for (auto input_node : dfg->graph->inputs[type]) {
-        auto exec_node = (TU_GraphExecNodeBase*)input_node;
+        auto exec_node = (ExecNode*)input_node;
         assert(input_node->kind != NODE_KIND_GRAPH);
         assert(exec_node->group < dfg->groups.size());
         dfg_ctx.group = dfg->groups[exec_node->group];
@@ -128,9 +128,9 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
     }
 }
 
-TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg) {
+GraphData tu_dfg_wait_result(TU_Dfg *dfg) {
     TU_Lock lck(dfg->mutex);
-    TU_GraphData result;
+    GraphData result;
     dfg->cond.wait(lck, [&](){ return dfg->graph->sink.result_queue.pop(&result); });
     return result;
 }
@@ -151,12 +151,12 @@ static void worker_stop(TU_DfgWorker *worker) {
     }
 }
 
-static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphData *data) {
+static void worker_node_exec(TU_DfgWorker *worker, Node *node, GraphData *data) {
     assert(worker != nullptr);
     assert(node != nullptr);
     assert(data != nullptr);
     assert(node->kind != NODE_KIND_GRAPH);
-    auto exec_node = (TU_GraphExecNodeBase*)node;
+    auto exec_node = (ExecNode*)node;
     TU_ExecContext exec_ctx = {
         .node = node,
         .dfg_ctx = {
@@ -180,18 +180,18 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
 
 // For tasks, workers try to dequeue up to a user specified amount of data to
 // process before moving to the next node.
-static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+static void worker_process_task_queue(TU_DfgWorker *worker, Node *node) {
     assert(node->kind == NODE_KIND_TASK);
     if (worker->group->max_dequeue_count > 1) {
         for (size_t i = 0; i < worker->group->max_dequeue_count; ++i) {
-            TU_GraphData data = {};
+            GraphData data = {};
             if (!tu_internal_node_dequeue(node, &data)) {
                 break;
             }
             worker_node_exec(worker, node, &data);
         }
     } else {
-        TU_GraphData data = {};
+        GraphData data = {};
         if (!tu_internal_node_dequeue(node, &data)) {
             return;
         }
@@ -203,9 +203,9 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
 // the ownership of the state, it processes all the elements untill the queue is
 // empty (unlike with tasks, we don't want to leave the state whire the queue
 // is not empty).
-static void worker_process_state_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
+static void worker_process_state_queue(TU_DfgWorker *worker, Node *node) {
     assert(node->kind == NODE_KIND_STATE);
-    TU_GraphData data = {};
+    GraphData data = {};
     while (tu_internal_node_dequeue(node, &data)) {
         worker_node_exec(worker, node, &data);
     }
@@ -218,8 +218,8 @@ static void worker_process_queues(TU_DfgWorker *worker) {
     size_t node_idx = 0;
     for (;;) {
         assert(node_idx < worker->group->nodes.size());
-        TU_GraphNode *node = worker->group->nodes[node_idx];
-        auto exec_node = (TU_GraphExecNodeBase*)node;
+        Node *node = worker->group->nodes[node_idx];
+        auto exec_node = (ExecNode*)node;
 
         // use load preemptively because fetch_add is expensive
         if (exec_node->thread_count.load() < exec_node->max_thread_count) {

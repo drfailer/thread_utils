@@ -37,7 +37,7 @@ struct TU_DfgWorkerGroup {
     TU_Dfg *dfg = nullptr;
     tu_u64 id = 0;
     size_t max_dequeue_count = 0;
-    TU_Array<TU_GraphNode *> nodes = {};
+    TU_Array<Node *> nodes = {};
 };
 
 // graph runner
@@ -45,7 +45,7 @@ struct TU_Dfg {
     TU_Mutex mutex;
     TU_Cond cond;
     TU_Array<TU_DfgWorkerGroup *> groups = {};
-    TU_Graph *graph = nullptr;
+    Graph *graph = nullptr;
     TU_TypeRegistry type_registry;
     TU_DfgProfileInfos prof_infos = {};
 
@@ -68,12 +68,12 @@ void tu_dfg_destroy(TU_Dfg *dfg);
 
 tu_u64 tu_dfg_add_worker_group(TU_Dfg *dfg, size_t thread_count, size_t max_dequeue_count);
 
-void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph);
+void tu_dfg_set_graph(TU_Dfg *dfg, Graph *graph);
 void tu_dfg_clear(TU_Dfg *dfg);
 void tu_dfg_exec(TU_Dfg *dfg);
 void tu_dfg_term(TU_Dfg *dfg);
 
 void tu_dfg_push_data(TU_Dfg *dfg, void *data, TU_TypeId type);
-TU_GraphData tu_dfg_wait_result(TU_Dfg *dfg);
+GraphData tu_dfg_wait_result(TU_Dfg *dfg);
 
 #endif

@@ -6,7 +6,7 @@
 #include <string>
 #include <sstream>
 
-struct TU_GraphExecNodeBaseProfileInfos {
+struct ExecNodeProfileInfos {
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_count;
     alignas(CACHE_LINE) TU_Atomic<size_t> exec_dur;
     alignas(CACHE_LINE) TU_Atomic<size_t> result_dur;
@@ -54,7 +54,7 @@ struct TU_GraphExecNodeBaseProfileInfos {
 };
 
 struct TU_DfgWorkerProfileInfos {
-    TU_Map<TU_GraphNode *, std::pair<TU_Duration, size_t>> exec_dur = {};
+    TU_Map<Node *, std::pair<TU_Duration, size_t>> exec_dur = {};
     size_t work_count = 0;
     TU_Duration work_time = {};
     TU_Duration sleep_time = {};
@@ -76,10 +76,10 @@ struct TU_DfgWorkerProfileInfos {
         this->work_time += tu_stopwatch_stop_and_get_time(&this->work_sleep_sw);
     }
 
-    void exec_begin(TU_GraphNode *) {
+    void exec_begin(Node *) {
         tu_stopwatch_start(&this->exec_sw);
     }
-    void exec_end(TU_GraphNode *node) {
+    void exec_end(Node *node) {
         this->exec_dur[node].first += tu_stopwatch_stop_and_get_time(&this->work_sleep_sw);
         this->exec_dur[node].second += 1;
     }

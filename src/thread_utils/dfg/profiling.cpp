@@ -36,10 +36,10 @@ static void dot_table_end(std::ostream &os) {
     os << "</table>";
 }
 
-static std::string get_exec_node_label(TU_GraphNode *node) {
+static std::string get_exec_node_label(Node *node) {
     static constexpr const char *sep = "\\n";
     assert(node->kind != NODE_KIND_GRAPH);
-    auto exec_node = (TU_GraphExecNodeBase*)node;
+    auto exec_node = (ExecNode*)node;
     std::ostringstream oss;
 
     dot_table_begin(oss);
@@ -57,7 +57,7 @@ static std::string get_exec_node_label(TU_GraphNode *node) {
     return oss.str();
 }
 
-static void graph_print_souce(TU_Graph *graph, std::ofstream &fs) {
+static void graph_print_souce(Graph *graph, std::ofstream &fs) {
     fs << "source [label=\"\",width=.1,shape=circle];" << std::endl;
     for (auto [type, inputs] : graph->inputs) {
         std::string edge = "source" + std::to_string(type);
@@ -70,7 +70,7 @@ static void graph_print_souce(TU_Graph *graph, std::ofstream &fs) {
     fs << "global_infos -> source;" << std::endl;
 }
 
-static void graph_print_sink(TU_Graph *graph, std::ofstream &fs) {
+static void graph_print_sink(Graph *graph, std::ofstream &fs) {
     fs << "sink [width=.1,shape=point];" << std::endl;
     for (auto [type, outputs] : graph->outputs) {
         for (auto node : outputs) {
@@ -82,9 +82,9 @@ static void graph_print_sink(TU_Graph *graph, std::ofstream &fs) {
     }
 }
 
-static std::string get_node_color(TU_GraphNode *node, TU_Duration exec_time) {
+static std::string get_node_color(Node *node, TU_Duration exec_time) {
     std::string color = "#000000";
-    auto exec_node = (TU_GraphExecNodeBase*)node;
+    auto exec_node = (ExecNode*)node;
     auto exec_dur = exec_node->prof_infos.exec_dur.load();
     auto worker_count = exec_node->prof_infos.worker_count;
     auto exec_ttl = TU_Duration(worker_count > 0 ? exec_dur / worker_count : 0);
@@ -101,14 +101,14 @@ static std::string get_node_color(TU_GraphNode *node, TU_Duration exec_time) {
     return ss.str();
 }
 
-static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration exec_time, size_t level) {
+static void graph_print_content(Graph *graph, std::ofstream &fs, TU_Duration exec_time, size_t level) {
     if (!ptr_arg_check(graph)) return;
     // print the nodes
-    for (TU_GraphNode *node : graph->nodes) {
+    for (Node *node : graph->nodes) {
         switch (node->kind) {
         case NODE_KIND_TASK: /* fallthrough */
         case NODE_KIND_STATE: {
-            auto exec_node = (TU_GraphExecNodeBase*)node;
+            auto exec_node = (ExecNode*)node;
             std::string color = get_node_color(node, exec_time);
             fs << ADDR(node) << " [label=<" << get_exec_node_label(node)
                 << ">,shape=rect,color=\"" << color << "\",penwidth=3];" << std::endl;
@@ -122,9 +122,9 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
             }
         } break;
         case NODE_KIND_GRAPH:
-            fs << "subgraph " << ADDR((TU_Graph*)node) << "{" << std::endl;
+            fs << "subgraph " << ADDR((Graph*)node) << "{" << std::endl;
             fs << "label=\"" << node->name << "\";" << std::endl;
-            graph_print_content((TU_Graph*)node, fs, exec_time, level + 1);
+            graph_print_content((Graph*)node, fs, exec_time, level + 1);
             fs << "}\\n";
             break;
         }
@@ -138,7 +138,7 @@ static void graph_print_worker_infos(TU_DfgWorker const &worker, std::ofstream &
        << td << tu_duration_to_string(worker.prof_infos.work_time) << " (work count = " << worker.prof_infos.work_count << ")</td>"
        << td << tu_duration_to_string(worker.prof_infos.sleep_time) << "</td>";
     for (auto node : worker.group->nodes) {
-        auto exec_node = (TU_GraphExecNodeBase*)node;
+        auto exec_node = (ExecNode*)node;
         auto infos = worker.prof_infos.exec_dur.at(node);
         auto node_ttl_exec = exec_node->prof_infos.exec_dur.load();
         auto ttl_exec = infos.first;
@@ -169,7 +169,7 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
         fs << "<td bgcolor=\"lightgray\">work time (" << global_exec_time << ")</td>";
         fs << "<td bgcolor=\"lightgray\">sleep time (" << global_exec_time << ")</td>";
         for (auto node : group->nodes) {
-            auto exec_node = (TU_GraphExecNodeBase*)node;
+            auto exec_node = (ExecNode*)node;
             size_t count = exec_node->prof_infos.exec_count.load();
             size_t dur = exec_node->prof_infos.exec_dur.load();
             std::string node_exec_avg = tu_duration_to_string(TU_Duration(count > 0 ? dur / count : 0));

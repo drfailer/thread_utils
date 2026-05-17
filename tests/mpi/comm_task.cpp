@@ -31,7 +31,7 @@ static ucs_status_t comm_am_handler(void *arg, const void *header, size_t header
 //       to do that (it is simpler, faster because the serialization can be
 //       done in // if needed and it is more flexible because we don't always
 //       want to send the same part of a same type).
-TU_GraphNode *tu_comm_task(TU_Dfg *dfg, TU_Graph *graph, const char *name, TU_CommTaskData *comm,
+Node *tu_comm_task(TU_Dfg *dfg, Graph *graph, const char *name, TU_CommTaskData *comm,
                            TU_Set<TU_TypeId> const &types, tu_u64 dfg_group) {
     int rank = -1, nb_processes = -1;
     MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
@@ -85,7 +85,7 @@ void tu_comm_task_destroy(TU_CommTaskData *comm) {
     ucx_finalize(&comm->ucx);
 }
 
-bool tu_comm_send_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec) {
+bool tu_comm_send_exec(Node *task, TU_TypeId type, TU_NodeExec exec) {
     if (type < 0) {
         printf("[TU_ERROR]: communicator tasks requres type ids to be positive (negative ids are reserved for internal use).\n");
         return false;
@@ -93,7 +93,7 @@ bool tu_comm_send_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec) {
     return tu_exec(task, type, exec);
 }
 
-bool tu_comm_recv_exec(TU_GraphNode *task, TU_TypeId type, TU_NodeExec exec) {
+bool tu_comm_recv_exec(Node *task, TU_TypeId type, TU_NodeExec exec) {
     if (type < 0) {
         printf("[TU_ERROR]: communicator tasks requres type ids to be positive (negative ids are reserved for internal use).\n");
         return false;
@@ -124,7 +124,7 @@ void tu_comm_send(TU_ExecContext *ctx, TU_CommPackage package) {
 
 static void comm_progress_result(TU_CommTaskData *comm, void *data, tu_i64 type) {
     assert(comm->node->b_exec->inputs.contains(-type - 1));
-    comm->node->b_exec->inputs[-type - 1].queue.push(TU_GraphData{data, -type - 1});
+    comm->node->b_exec->inputs[-type - 1].queue.push(GraphData{data, -type - 1});
     assert(comm->node->b_exec->group < comm->dfg->groups.size());
     comm->dfg->groups[comm->node->b_exec->group]->sem.release();
 }

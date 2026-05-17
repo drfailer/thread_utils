@@ -61,7 +61,7 @@ void dfg_hadamard(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {
     defer(tu_dfg_destroy(&dfg));
     tu_u64 group = tu_dfg_add_worker_group(&dfg, 40, 16);
 
-    TU_Graph *graph = tu_graph_create("hadamard", {T_ABCTiles}, {T_ABCTiles});
+    Graph *graph = tu_graph_create("hadamard", {T_ABCTiles}, {T_ABCTiles});
     defer(tu_graph_destroy(graph));
 
     auto product_task = tu_task(graph, "product_task", nullptr, {T_ABCTiles}, {T_ABCTiles}, group, 40);

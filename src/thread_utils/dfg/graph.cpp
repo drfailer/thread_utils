@@ -123,6 +123,7 @@ void tu_graph_destroy(TU_Graph *graph) {
            break;
         }
     }
+    delete graph;
 }
 
 bool tu_exec(TU_GraphNode *node, TU_TypeId type, TU_NodeExec exec) {

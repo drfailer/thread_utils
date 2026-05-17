@@ -104,8 +104,8 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
     // print the nodes
     for (TU_GraphNode *node : graph->nodes) {
         switch (node->kind) {
-        case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
-        case TU_GRAPH_NODE_KIND_STATE: {
+        case NODE_KINDTASK: /* fallthrough */
+        case NODE_KINDSTATE: {
             std::string color = get_node_color(node, exec_time);
             fs << ADDR(node) << " [label=<" << get_exec_node_label(node)
                 << ">,shape=rect,color=\"" << color << "\",penwidth=3];" << std::endl;
@@ -118,7 +118,7 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
                 }
             }
         } break;
-        case TU_GRAPH_NODE_KIND_GRAPH:
+        case NODE_KINDGRAPH:
             fs << "subgraph " << ADDR(node->sub_type.graph) << "{" << std::endl;
             fs << "label=\"" << node->sub_type.graph->name << "\";" << std::endl;
             graph_print_content(node->sub_type.graph, fs, exec_time, level + 1);

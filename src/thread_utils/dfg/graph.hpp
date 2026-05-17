@@ -9,11 +9,11 @@
 #include "decl.hpp"
 #include "profiling.hpp"
 
-enum TU_GraphNodeKind {
+enum NodeKind {
     // TODO: merge task and state into executable node
-    TU_GRAPH_NODE_KIND_TASK,
-    TU_GRAPH_NODE_KIND_STATE,
-    TU_GRAPH_NODE_KIND_GRAPH,
+    NODE_KINDTASK,
+    NODE_KINDSTATE,
+    NODE_KINDGRAPH,
 };
 
 // NOTE: the queue belongs to the task and state to allow different queue implementations for both
@@ -65,7 +65,7 @@ struct TU_Graph {
 
 struct TU_GraphNode {
     TU_GraphExecNodeBase *b_exec;
-    TU_GraphNodeKind kind;
+    NodeKind kind;
     union { // we have to use pointers for the union
         TU_GraphTask *task;
         TU_GraphState *state;

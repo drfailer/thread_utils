@@ -55,7 +55,7 @@ static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
             for (auto &worker : group->workers) {
                 worker.prof_infos.exec_dur[node] = {};
             }
-        } else if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+        } else if (node->kind == NODE_KINDGRAPH) {
             dfg_register_nodes(dfg, node->sub_type.graph);
         }
     }
@@ -178,7 +178,7 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
 // For tasks, workers try to dequeue up to a user specified amount of data to
 // process before moving to the next node.
 static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
-    assert(node->kind == TU_GRAPH_NODE_KIND_TASK);
+    assert(node->kind == NODE_KINDTASK);
     if (worker->group->max_dequeue_count > 1) {
         for (size_t i = 0; i < worker->group->max_dequeue_count; ++i) {
             TU_GraphData data = {};
@@ -201,7 +201,7 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
 // empty (unlike with tasks, we don't want to leave the state whire the queue
 // is not empty).
 static void worker_process_state_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
-    assert(node->kind == TU_GRAPH_NODE_KIND_STATE);
+    assert(node->kind == NODE_KINDSTATE);
     TU_GraphData data = {};
     while (tu_internal_node_dequeue(node, &data)) {
         worker_node_exec(worker, node, &data);
@@ -223,8 +223,8 @@ static void worker_process_queues(TU_DfgWorker *worker) {
             // queue at the same time
             if (node->b_exec->thread_count.fetch_add(1) < node->b_exec->max_thread_count) {
                 switch (node->kind) {
-                case TU_GRAPH_NODE_KIND_STATE: worker_process_state_queue(worker, node); break;
-                case TU_GRAPH_NODE_KIND_TASK: worker_process_task_queue(worker, node); break;
+                case NODE_KINDSTATE: worker_process_state_queue(worker, node); break;
+                case NODE_KINDTASK: worker_process_task_queue(worker, node); break;
                 default: assert(false && "we shouldn't arrive here"); break;
                 }
             }

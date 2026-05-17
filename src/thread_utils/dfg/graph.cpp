@@ -21,7 +21,7 @@ static TU_GraphExecNodeBase *make_exec_base(TU_Set<TU_TypeId> const &input_types
 }
 
 // TODO(ALLOCATOR): replace new with allocator
-static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const char *name, void *data,
+static TU_GraphNode *make_node(TU_Graph *graph, NodeKind kind, const char *name, void *data,
                                TU_Set<TU_TypeId> const &input_types, TU_Set<TU_TypeId> const &output_types,
                                tu_u64 dfg_group, tu_u64 max_thread_count) {
     TU_GraphNode *node = new TU_GraphNode();
@@ -30,17 +30,17 @@ static TU_GraphNode *make_node(TU_Graph *graph, TU_GraphNodeKind kind, const cha
     node->name = name;
     node->graph = graph;
     switch (kind) {
-    case TU_GRAPH_NODE_KIND_TASK:
+    case NODE_KINDTASK:
         node->sub_type.task = new TU_GraphTask();
         node->sub_type.task->data = data;
         node->b_exec = make_exec_base(input_types, output_types, dfg_group, max_thread_count);
         break;
-    case TU_GRAPH_NODE_KIND_STATE:
+    case NODE_KINDSTATE:
         node->sub_type.state = new TU_GraphState();
         node->sub_type.state->data = data;
         node->b_exec = make_exec_base(input_types, output_types, dfg_group, max_thread_count);
         break;
-    case TU_GRAPH_NODE_KIND_GRAPH:
+    case NODE_KINDGRAPH:
         node->sub_type.graph = nullptr;
         break;
     }
@@ -63,16 +63,16 @@ TU_Graph tu_graph_create(const char *name, TU_Set<TU_TypeId> const &input_types,
 
 TU_GraphNode *tu_task(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types,
                       TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group, tu_u64 max_thread_count) {
-    return make_node(graph, TU_GRAPH_NODE_KIND_TASK, name, data, input_types, output_types, dfg_group, max_thread_count);
+    return make_node(graph, NODE_KINDTASK, name, data, input_types, output_types, dfg_group, max_thread_count);
 }
 
 TU_GraphNode *tu_state(TU_Graph *graph, const char *name, void *data, TU_Set<TU_TypeId> const &input_types,
                        TU_Set<TU_TypeId> const &output_types, tu_u64 dfg_group) {
-    return make_node(graph, TU_GRAPH_NODE_KIND_STATE, name, data, input_types, output_types, dfg_group, 1);
+    return make_node(graph, NODE_KINDSTATE, name, data, input_types, output_types, dfg_group, 1);
 }
 
 TU_GraphNode *tu_sub_graph(TU_Graph *graph, TU_Graph *sub_graph) {
-    TU_GraphNode *node = make_node(graph, TU_GRAPH_NODE_KIND_GRAPH, graph->name, nullptr, {}, {}, 0, 0);
+    TU_GraphNode *node = make_node(graph, NODE_KINDGRAPH, graph->name, nullptr, {}, {}, 0, 0);
     node->sub_type.graph = sub_graph;
     // we need to reset the sink_graph pointer to avoid tasks to output to the
     // result queue for nothing
@@ -90,8 +90,8 @@ bool tu_graph_check(TU_Graph *graph) {
     bool ok = true;
     for (TU_GraphNode *node : graph->nodes) {
         switch (node->kind) {
-        case TU_GRAPH_NODE_KIND_TASK: /* fallthrough */
-        case TU_GRAPH_NODE_KIND_STATE: {
+        case NODE_KINDTASK: /* fallthrough */
+        case NODE_KINDSTATE: {
             assert(node->b_exec != nullptr);
             for (auto &[type, input] : node->b_exec->inputs) {
                 if (input.exec == nullptr) {
@@ -107,7 +107,7 @@ bool tu_graph_check(TU_Graph *graph) {
                 }
             }
         } break;
-        case TU_GRAPH_NODE_KIND_GRAPH:
+        case NODE_KINDGRAPH:
             ok &= tu_graph_check(node->sub_type.graph);
             break;
         }
@@ -119,9 +119,9 @@ bool tu_graph_check(TU_Graph *graph) {
 void tu_graph_destroy(TU_Graph *graph) {
     for (TU_GraphNode *node : graph->nodes) {
         switch (node->kind) {
-        case TU_GRAPH_NODE_KIND_TASK: delete node->sub_type.task; break;
-        case TU_GRAPH_NODE_KIND_STATE: delete node->sub_type.state; break;
-        case TU_GRAPH_NODE_KIND_GRAPH:
+        case NODE_KINDTASK: delete node->sub_type.task; break;
+        case NODE_KINDSTATE: delete node->sub_type.state; break;
+        case NODE_KINDGRAPH:
            // subgraphs are created by the user, therefore, we don't delete them here.
            break;
         }
@@ -132,7 +132,7 @@ void tu_graph_destroy(TU_Graph *graph) {
 
 bool tu_exec(TU_GraphNode *node, TU_TypeId type, TU_NodeExec exec) {
     if (!ptr_arg_check(node)) return false;
-    if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->kind == NODE_KINDGRAPH) {
         printf("[TU_ERROR]: cannot add exec function to graph node `%s'\n", node->name);
         return false;
     }
@@ -213,7 +213,7 @@ static bool tu_add_outputs_graph(TU_Graph *graph, TU_Graph *sub_graph) {
 bool tu_add_input(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
     if (!ptr_arg_check(graph)) return false;
     if (!ptr_arg_check(node)) return false;
-    if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->kind == NODE_KINDGRAPH) {
         return tu_add_input_graph(graph, node->sub_type.graph, type);
     }
     assert(node->b_exec != nullptr);
@@ -234,7 +234,7 @@ bool tu_add_input(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
 bool tu_add_inputs(TU_Graph *graph, TU_GraphNode *node) {
     if (!ptr_arg_check(graph)) return false;
     if (!ptr_arg_check(node)) return false;
-    if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->kind == NODE_KINDGRAPH) {
         return tu_add_inputs_graph(graph, node->sub_type.graph);
     }
     assert(node->b_exec != nullptr);
@@ -256,7 +256,7 @@ bool tu_add_inputs(TU_Graph *graph, TU_GraphNode *node) {
 bool tu_add_output(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
     if (!ptr_arg_check(graph)) return false;
     if (!ptr_arg_check(node)) return false;
-    if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->kind == NODE_KINDGRAPH) {
         return tu_add_output_graph(graph, node->sub_type.graph, type);
     }
     auto graph_output = graph->outputs.find(type);
@@ -279,7 +279,7 @@ bool tu_add_output(TU_Graph *graph, TU_GraphNode *node, TU_TypeId type) {
 bool tu_add_outputs(TU_Graph *graph, TU_GraphNode *node) {
     if (!ptr_arg_check(graph)) return false;
     if (!ptr_arg_check(node)) return false;
-    if (node->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (node->kind == NODE_KINDGRAPH) {
         return tu_add_outputs_graph(graph, node->sub_type.graph);
     }
     assert(node->b_exec != nullptr);
@@ -305,7 +305,7 @@ bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
     if (!ptr_arg_check(receiver)) return false;
 
     // when the sender is a graph, we need to connect all its outputs to the receiver
-    if (sender->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (sender->kind == NODE_KINDGRAPH) {
         for (TU_GraphNode *output_node : sender->sub_type.graph->outputs[type]) {
             if (!tu_edge(output_node, receiver, type)) {
                 return false;
@@ -315,7 +315,7 @@ bool tu_edge(TU_GraphNode *sender, TU_GraphNode *receiver, TU_TypeId type) {
     }
 
     // when the receiver is a graph, we need to connect all its inputs to the sender
-    if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (receiver->kind == NODE_KINDGRAPH) {
         for (TU_GraphNode *input_node : receiver->sub_type.graph->inputs[type]) {
             if (!tu_edge(sender, input_node, type)) {
                 return false;
@@ -343,7 +343,7 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     if (!ptr_arg_check(receiver)) return false;
 
     // when the sender is a graph, we need to connect all its outputs to the receiver
-    if (sender->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (sender->kind == NODE_KINDGRAPH) {
         for (auto &outputs : sender->sub_type.graph->outputs) {
             for (auto &output_node : outputs.second) {
                 if (!tu_edges(output_node, receiver)) {
@@ -355,7 +355,7 @@ bool tu_edges(TU_GraphNode *sender, TU_GraphNode *receiver) {
     }
 
     // when the receiver is a graph, we need to connect all its inputs to the sender
-    if (receiver->kind == TU_GRAPH_NODE_KIND_GRAPH) {
+    if (receiver->kind == NODE_KINDGRAPH) {
         for (auto &inputs : receiver->sub_type.graph->inputs) {
             for (auto &input_node : inputs.second) {
                 if (!tu_edges(sender, input_node)) {
@@ -435,9 +435,9 @@ void tu_result(TU_ExecContext *exec_ctx, void *ptr, TU_TypeId type) {
 void *tu_node_data(TU_ExecContext *exec_ctx) {
     assert(exec_ctx->node != nullptr);
     switch (exec_ctx->node->kind) {
-    case TU_GRAPH_NODE_KIND_TASK: return exec_ctx->node->sub_type.task->data;
-    case TU_GRAPH_NODE_KIND_STATE: return exec_ctx->node->sub_type.state->data;
-    case TU_GRAPH_NODE_KIND_GRAPH: return nullptr;
+    case NODE_KINDTASK: return exec_ctx->node->sub_type.task->data;
+    case NODE_KINDSTATE: return exec_ctx->node->sub_type.state->data;
+    case NODE_KINDGRAPH: return nullptr;
     }
     assert(false && "unreachable");
     return nullptr;

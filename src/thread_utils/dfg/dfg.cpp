@@ -44,19 +44,20 @@ void tu_dfg_clear(TU_Dfg *dfg) {
 
 static void dfg_register_nodes(TU_Dfg *dfg, TU_Graph *graph) {
     for (TU_GraphNode *node : graph->nodes) {
-        if (node->b_exec != nullptr) {
-            if (node->b_exec->group >= dfg->groups.size()) {
+        if (node->kind != NODE_KIND_GRAPH) {
+            auto exec_node = (TU_GraphExecNodeBase*)node;
+            if (exec_node->group >= dfg->groups.size()) {
                 printf("[TU_ERROR]: cannot register node `%s' group `%ld' in dfg.\n",
-                       node->name, node->b_exec->group);
+                       node->name, exec_node->group);
                 return;
             }
-            auto group = dfg->groups[node->b_exec->group];
+            auto group = dfg->groups[exec_node->group];
             group->nodes.push_back(node);
             for (auto &worker : group->workers) {
                 worker.prof_infos.exec_dur[node] = {};
             }
-        } else if (node->kind == NODE_KINDGRAPH) {
-            dfg_register_nodes(dfg, node->sub_type.graph);
+        } else if (node->kind == NODE_KIND_GRAPH) {
+            dfg_register_nodes(dfg, (TU_Graph*)graph);
         }
     }
 }
@@ -66,7 +67,7 @@ void tu_dfg_set_graph(TU_Dfg *dfg, TU_Graph *graph) {
     if (!ptr_arg_check(graph)) return;
     if (dfg->graph != nullptr && dfg->graph != graph) {
         printf("[TU_ERROR]: cannot execute graph `%s', dfg must be cleared before.\n",
-               graph->name);
+               graph->node.name);
         return;
     }
     dfg->prof_infos.create_begin();
@@ -109,7 +110,7 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
     assert(dfg->graph != nullptr);
     if (!dfg->graph->inputs.contains(type)) {
         printf("[TU_ERROR]: graph `%s' doesn't take type `%ld' as input.\n",
-               dfg->graph->name, type);
+               dfg->graph->node.name, type);
         return;
     }
     TU_GraphData data{ptr, type};
@@ -119,9 +120,10 @@ void tu_dfg_push_data(TU_Dfg *dfg, void *ptr, TU_TypeId type) {
         .worker = nullptr,
     };
     for (auto input_node : dfg->graph->inputs[type]) {
-        assert(input_node->b_exec != nullptr);
-        assert(input_node->b_exec->group < dfg->groups.size());
-        dfg_ctx.group = dfg->groups[input_node->b_exec->group];
+        auto exec_node = (TU_GraphExecNodeBase*)input_node;
+        assert(input_node->kind != NODE_KIND_GRAPH);
+        assert(exec_node->group < dfg->groups.size());
+        dfg_ctx.group = dfg->groups[exec_node->group];
         tu_internal_node_enqueue(&dfg_ctx, input_node, &data);
     }
 }
@@ -153,7 +155,8 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     assert(worker != nullptr);
     assert(node != nullptr);
     assert(data != nullptr);
-    assert(node->b_exec != nullptr);
+    assert(node->kind != NODE_KIND_GRAPH);
+    auto exec_node = (TU_GraphExecNodeBase*)node;
     TU_ExecContext exec_ctx = {
         .node = node,
         .dfg_ctx = {
@@ -164,13 +167,13 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
     };
     TU_Stopwatch sw;
     worker->prof_infos.exec_begin(node);
-    node->b_exec->prof_infos.exec_begin(&sw);
+    exec_node->prof_infos.exec_begin(&sw);
 
-    auto input = node->b_exec->inputs.find(data->type);
-    assert(input != node->b_exec->inputs.end());
+    auto input = exec_node->inputs.find(data->type);
+    assert(input != exec_node->inputs.end());
     input->second.exec(&exec_ctx, data->data, data->type);
 
-    node->b_exec->prof_infos.exec_end(&sw);
+    exec_node->prof_infos.exec_end(&sw);
     worker->prof_infos.exec_end(node);
     worker->process_count += 1;
 }
@@ -178,7 +181,7 @@ static void worker_node_exec(TU_DfgWorker *worker, TU_GraphNode *node, TU_GraphD
 // For tasks, workers try to dequeue up to a user specified amount of data to
 // process before moving to the next node.
 static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
-    assert(node->kind == NODE_KINDTASK);
+    assert(node->kind == NODE_KIND_TASK);
     if (worker->group->max_dequeue_count > 1) {
         for (size_t i = 0; i < worker->group->max_dequeue_count; ++i) {
             TU_GraphData data = {};
@@ -201,7 +204,7 @@ static void worker_process_task_queue(TU_DfgWorker *worker, TU_GraphNode *node) 
 // empty (unlike with tasks, we don't want to leave the state whire the queue
 // is not empty).
 static void worker_process_state_queue(TU_DfgWorker *worker, TU_GraphNode *node) {
-    assert(node->kind == NODE_KINDSTATE);
+    assert(node->kind == NODE_KIND_STATE);
     TU_GraphData data = {};
     while (tu_internal_node_dequeue(node, &data)) {
         worker_node_exec(worker, node, &data);
@@ -216,19 +219,20 @@ static void worker_process_queues(TU_DfgWorker *worker) {
     for (;;) {
         assert(node_idx < worker->group->nodes.size());
         TU_GraphNode *node = worker->group->nodes[node_idx];
+        auto exec_node = (TU_GraphExecNodeBase*)node;
 
         // use load preemptively because fetch_add is expensive
-        if (node->b_exec->thread_count.load() < node->b_exec->max_thread_count) {
+        if (exec_node->thread_count.load() < exec_node->max_thread_count) {
             // Each nodes has a maximum number of workers that can process its
             // queue at the same time
-            if (node->b_exec->thread_count.fetch_add(1) < node->b_exec->max_thread_count) {
+            if (exec_node->thread_count.fetch_add(1) < exec_node->max_thread_count) {
                 switch (node->kind) {
-                case NODE_KINDSTATE: worker_process_state_queue(worker, node); break;
-                case NODE_KINDTASK: worker_process_task_queue(worker, node); break;
+                case NODE_KIND_STATE: worker_process_state_queue(worker, node); break;
+                case NODE_KIND_TASK: worker_process_task_queue(worker, node); break;
                 default: assert(false && "we shouldn't arrive here"); break;
                 }
             }
-            node->b_exec->thread_count -= 1;
+            exec_node->thread_count -= 1;
         }
 
         // when the node count is reach, we restart, unless all the queues are empty

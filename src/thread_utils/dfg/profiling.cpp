@@ -38,18 +38,19 @@ static void dot_table_end(std::ostream &os) {
 
 static std::string get_exec_node_label(TU_GraphNode *node) {
     static constexpr const char *sep = "\\n";
-    assert(node->b_exec != nullptr);
+    assert(node->kind != NODE_KIND_GRAPH);
+    auto exec_node = (TU_GraphExecNodeBase*)node;
     std::ostringstream oss;
 
     dot_table_begin(oss);
-    oss << "<tr><td colspan=\"2\">" << node->name << " x" << node->b_exec->max_thread_count
+    oss << "<tr><td colspan=\"2\">" << node->name << " x" << exec_node->max_thread_count
         << "</td></tr>" << sep;
-    for (auto &[type, input] : node->b_exec->inputs) {
+    for (auto &[type, input] : exec_node->inputs) {
         if constexpr (requires { input.queue.prof_str(); }) {
             oss << "<tr><td>queue[" << type << "]</td><td>" << input.queue.prof_str() << "</td></tr>" << sep;
         }
     }
-    oss << "<tr><td colspan=\"2\">" << node->b_exec->prof_infos.prof_str() << "</td></tr>";
+    oss << "<tr><td colspan=\"2\">" << exec_node->prof_infos.prof_str() << "</td></tr>";
     // TODO: I also want to profile the map acces times
     // TODO: We need the lock time for the state
     dot_table_end(oss);
@@ -83,8 +84,9 @@ static void graph_print_sink(TU_Graph *graph, std::ofstream &fs) {
 
 static std::string get_node_color(TU_GraphNode *node, TU_Duration exec_time) {
     std::string color = "#000000";
-    auto exec_dur = node->b_exec->prof_infos.exec_dur.load();
-    auto worker_count = node->b_exec->prof_infos.worker_count;
+    auto exec_node = (TU_GraphExecNodeBase*)node;
+    auto exec_dur = exec_node->prof_infos.exec_dur.load();
+    auto worker_count = exec_node->prof_infos.worker_count;
     auto exec_ttl = TU_Duration(worker_count > 0 ? exec_dur / worker_count : 0);
     // stollen from Hedgehog:
     double avg_time = exec_time.count() > 0 ? (double) exec_ttl.count() / (double) exec_time.count() : 0;
@@ -104,12 +106,13 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
     // print the nodes
     for (TU_GraphNode *node : graph->nodes) {
         switch (node->kind) {
-        case NODE_KINDTASK: /* fallthrough */
-        case NODE_KINDSTATE: {
+        case NODE_KIND_TASK: /* fallthrough */
+        case NODE_KIND_STATE: {
+            auto exec_node = (TU_GraphExecNodeBase*)node;
             std::string color = get_node_color(node, exec_time);
             fs << ADDR(node) << " [label=<" << get_exec_node_label(node)
                 << ">,shape=rect,color=\"" << color << "\",penwidth=3];" << std::endl;
-            for (auto &[type, output] : node->b_exec->outputs) {
+            for (auto &[type, output] : exec_node->outputs) {
                 std::string edge = "\"" + std::to_string((uintptr_t)node) + std::to_string(type) + "\"";
                 fs << edge << " [label=\"" << std::to_string(type) << "\"];" << std::endl;
                 fs << ADDR(node) << " -> " << edge << ";" << std::endl;
@@ -118,10 +121,10 @@ static void graph_print_content(TU_Graph *graph, std::ofstream &fs, TU_Duration 
                 }
             }
         } break;
-        case NODE_KINDGRAPH:
-            fs << "subgraph " << ADDR(node->sub_type.graph) << "{" << std::endl;
-            fs << "label=\"" << node->sub_type.graph->name << "\";" << std::endl;
-            graph_print_content(node->sub_type.graph, fs, exec_time, level + 1);
+        case NODE_KIND_GRAPH:
+            fs << "subgraph " << ADDR((TU_Graph*)node) << "{" << std::endl;
+            fs << "label=\"" << node->name << "\";" << std::endl;
+            graph_print_content((TU_Graph*)node, fs, exec_time, level + 1);
             fs << "}\\n";
             break;
         }
@@ -135,15 +138,16 @@ static void graph_print_worker_infos(TU_DfgWorker const &worker, std::ofstream &
        << td << tu_duration_to_string(worker.prof_infos.work_time) << " (work count = " << worker.prof_infos.work_count << ")</td>"
        << td << tu_duration_to_string(worker.prof_infos.sleep_time) << "</td>";
     for (auto node : worker.group->nodes) {
+        auto exec_node = (TU_GraphExecNodeBase*)node;
         auto infos = worker.prof_infos.exec_dur.at(node);
-        auto node_ttl_exec = node->b_exec->prof_infos.exec_dur.load();
+        auto node_ttl_exec = exec_node->prof_infos.exec_dur.load();
         auto ttl_exec = infos.first;
         TU_Duration avg_exec = {};
         double percent_exec = 100 * (node_ttl_exec > 0 ? (double)ttl_exec.count() / (double)node_ttl_exec : 0);
         if (infos.second > 0) {
             avg_exec = TU_Duration(infos.second > 0 ? ttl_exec.count() / infos.second : 0);
             // TODO: it is not great to modify the profile infos here
-            node->b_exec->prof_infos.worker_count += 1;
+            exec_node->prof_infos.worker_count += 1;
         }
         fs << td << tu_duration_to_string(avg_exec)
            << " / " << tu_duration_to_string(ttl_exec)
@@ -165,15 +169,16 @@ static void graph_print_runner_infos(TU_Dfg *dfg, std::ofstream &fs) {
         fs << "<td bgcolor=\"lightgray\">work time (" << global_exec_time << ")</td>";
         fs << "<td bgcolor=\"lightgray\">sleep time (" << global_exec_time << ")</td>";
         for (auto node : group->nodes) {
-            size_t count = node->b_exec->prof_infos.exec_count.load();
-            size_t dur = node->b_exec->prof_infos.exec_dur.load();
+            auto exec_node = (TU_GraphExecNodeBase*)node;
+            size_t count = exec_node->prof_infos.exec_count.load();
+            size_t dur = exec_node->prof_infos.exec_dur.load();
             std::string node_exec_avg = tu_duration_to_string(TU_Duration(count > 0 ? dur / count : 0));
             std::string node_exec_ttl = tu_duration_to_string(TU_Duration(dur));
             fs << "<td bgcolor=\"lightgray\">" << node->name
                << " (" << node_exec_avg << " / " << node_exec_ttl << " - " << count << ")"
-               << " | max_threads = " << node->b_exec->max_thread_count << "</td>";
+               << " | max_threads = " << exec_node->max_thread_count << "</td>";
             // TODO: it is not great to modify the profile infos here
-            node->b_exec->prof_infos.worker_count = 0;
+            exec_node->prof_infos.worker_count = 0;
         }
         fs << "</tr>" << sep;
 
@@ -201,7 +206,7 @@ void tu_graph_print_to_dot(TU_Dfg *dfg, const char *filename) {
     // TODO: print dfg infos
 
     fs << "digraph " << ADDR(dfg->graph) << "{" << std::endl;
-    fs << "label=\"" << dfg->graph->name
+    fs << "label=\"" << dfg->graph->node.name
        << "\\n Creation time: " << tu_duration_to_string(dfg->prof_infos.creation_time)
        << "\\n Execution time: " << tu_duration_to_string(dfg->prof_infos.execution_time)
        << "\\n Shutdown time: " << tu_duration_to_string(dfg->prof_infos.shutdown_time)

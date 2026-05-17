@@ -9,9 +9,9 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M_SIZE = 20000;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 2048;
-#define DGEMM_HH
+constexpr size_t M_SIZE = 1024;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 256;
+// #define DGEMM_HH
 
 #ifdef DGEMM_HH
 #include "hedgehog_dgemm.hpp"
@@ -71,7 +71,7 @@ void tm_dgemm(Matrix &A, Matrix &B, Matrix &C, size_t tile_size) {// {{{
     // tu_u64 product_task_group = task_group;
     // tu_u64 sum_task_group = task_group;
 
-    tu_u64 unique_group = tu_tm_add_thread_group(&tm, 40);
+    tu_u64 unique_group = tu_tm_add_thread_group(&tm, 4);
     tu_u64 sum_state_group = unique_group;
     tu_u64 product_state_group = unique_group;
     tu_u64 split_task_group = unique_group;
@@ -298,8 +298,8 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_u64 product_state_group = group;
     tu_u64 sum_state_group = group;
 
-    TU_Graph graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
-    defer(tu_graph_destroy(&graph));
+    TU_Graph *graph = tu_graph_create("dgemm", {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileC});
+    defer(tu_graph_destroy(graph));
 
     SplitTaskData split_task_data{
         .tile_size = TILE_SIZE,
@@ -330,11 +330,11 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
         .TK = TK,
     };
 
-    auto split_task    = tu_task(&graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group, 3);
-    auto product_task  = tu_task(&graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group, 40);
-    auto sum_task      = tu_task(&graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group, 40);
-    auto product_state = tu_state(&graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, product_state_group);
-    auto sum_state     = tu_state(&graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, sum_state_group);
+    auto split_task    = tu_task(graph, "split_task", &split_task_data, {T_MatrixA, T_MatrixB, T_MatrixC}, {T_TileA, T_TileB, T_TileC}, split_group, 3);
+    auto product_task  = tu_task(graph, "product_task", nullptr, {T_ABPTiles}, {T_TileP}, product_group, 40);
+    auto sum_task      = tu_task(graph, "sum_task", nullptr, {T_PCTiles}, {T_PCTiles}, sum_group, 40);
+    auto product_state = tu_state(graph, "product_state", &product_state_data, {T_TileA, T_TileB}, {T_ABPTiles}, product_state_group);
+    auto sum_state     = tu_state(graph, "sum_state", &sum_state_data, {T_TileC, T_TileP, T_PCTiles}, {T_PCTiles, T_TileC}, sum_state_group);
 
     tu_exec(split_task, T_MatrixA, &split_task_exec);
     tu_exec(split_task, T_MatrixB, &split_task_exec);
@@ -351,18 +351,18 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
     tu_exec(sum_state, T_TileP, &sum_state_exec_tile_p);
     tu_exec(sum_state, T_PCTiles, &sum_state_exec_tile_pc_tiles);
 
-    tu_add_inputs(&graph, split_task);
+    tu_add_inputs(graph, split_task);
     tu_edges(split_task, product_state);
     tu_edges(split_task, sum_state);
     tu_edges(product_state, product_task);
     tu_edges(product_task, sum_state);
     tu_edges(sum_state, sum_task);
     tu_edges(sum_task, sum_state);
-    tu_add_outputs(&graph, sum_state);
+    tu_add_outputs(graph, sum_state);
 
-    tu_graph_check(&graph);
+    tu_graph_check(graph);
 
-    tu_dfg_set_graph(&dfg, &graph);
+    tu_dfg_set_graph(&dfg, graph);
     tu_dfg_exec(&dfg);
     tu_dfg_push_data(&dfg, &A, T_MatrixA);
     tu_dfg_push_data(&dfg, &B, T_MatrixB);

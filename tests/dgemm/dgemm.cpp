@@ -9,8 +9,8 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M_SIZE = 1024;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 256;
+constexpr size_t M_SIZE = 256;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 128;
 // #define DGEMM_HH
 
 #ifdef DGEMM_HH
@@ -30,6 +30,7 @@ void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
 }
 
 MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
+    printf("allocate tile [%ld, %ld]\n", row, col);
     auto tile = new MatrixTile();
     tile->row = row;
     tile->col = col;
@@ -42,6 +43,7 @@ MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
 }
 
 void deallocate_tile(MatrixTile *tile) {
+    printf("release tile [%ld, %ld]\n", tile->row, tile->col);
     delete[] tile->data;
     delete tile;
 }
@@ -419,6 +421,8 @@ int main(int, char **) {
     Matrix E(M, N); // Expected
     // matrix_init_double(A);
     // matrix_init_double(B);
+    matrix_init_int(A);
+    matrix_init_int(B);
 
     printf("compute ground truth...\n");
     matmul(A, B, E);

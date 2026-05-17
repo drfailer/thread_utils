@@ -151,6 +151,7 @@ void sum_state_exec_tile_pc_tiles(TU_ExecContext *ctx, void *rawdata, tu_i64 typ
     auto tiles = (std::pair<MatrixTile *, MatrixTile *>*)rawdata;
     auto c = tiles->second;
 
+    deallocate_tile(tiles->first);
     delete tiles;
     task_data->count -= 1;
     if (task_data->count == 0) {

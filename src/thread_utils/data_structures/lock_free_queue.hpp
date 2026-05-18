@@ -11,7 +11,7 @@
 #include <cassert>
 
 // FIXME: the node pool makes the push a lot slower for some reason.
-// #define TU_LFQ_NODE_POOL
+#define TU_LFQ_NODE_POOL
 
 template <typename T>
 struct TU_LockFreeQueueNode;

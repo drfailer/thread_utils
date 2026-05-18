@@ -98,7 +98,8 @@ bool tu_comm_recv_exec(Node *task, TU_TypeId type, TU_NodeExec exec) {
         printf("[TU_ERROR]: communicator tasks requres type ids to be positive (negative ids are reserved for internal use).\n");
         return false;
     }
-    auto comm = (TU_CommTaskData *)task->sub_type.task->data;
+    auto exec_node = (ExecNode *)task;
+    auto comm = (TU_CommTaskData *)exec_node->data;
     // To distinguish the data to send and the data that is received, we use
     // negative type ids. On the receiver end, the type will be negative and we
     // must compute the original positive id for the user exec function. This
@@ -123,10 +124,11 @@ void tu_comm_send(TU_ExecContext *ctx, TU_CommPackage package) {
 }
 
 static void comm_progress_result(TU_CommTaskData *comm, void *data, tu_i64 type) {
-    assert(comm->node->b_exec->inputs.contains(-type - 1));
-    comm->node->b_exec->inputs[-type - 1].queue.push(GraphData{data, -type - 1});
-    assert(comm->node->b_exec->group < comm->dfg->groups.size());
-    comm->dfg->groups[comm->node->b_exec->group]->sem.release();
+    auto exec_node = (ExecNode *)comm->node;
+    assert(exec_node->inputs.contains(-type - 1));
+    exec_node->inputs[-type - 1].queue.push(GraphData{data, -type - 1});
+    assert(exec_node->group < comm->dfg->groups.size());
+    comm->dfg->groups[exec_node->group]->sem.release();
 }
 
 static ucs_status_t comm_am_handler(void *arg, const void *header_ptr, size_t header_length,

@@ -17,21 +17,21 @@ void test_graph(uint32_t rank) {
     tu_u64 compute_group = tu_dfg_add_worker_group(&dfg, 10, 16);
     tu_u64 comm_group = tu_dfg_add_worker_group(&dfg, 1, 1);
 
-    Graph graph = tu_graph_create("comm_graph", {1}, {1});
-    defer(tu_graph_destroy(&graph));
+    Graph *graph = tu_graph_create("comm_graph", {1}, {1});
+    defer(tu_graph_destroy(graph));
 
     TU_CommTaskData comm_scatter = {};
-    Node *scatter_task = tu_comm_task(&dfg, &graph, "comm_scatter", &comm_scatter, {1}, comm_group);
+    Node *scatter_task = tu_comm_task(&dfg, graph, "comm_scatter", &comm_scatter, {1}, comm_group);
     assert(scatter_task != nullptr);
     defer(tu_comm_task_destroy(&comm_scatter));
     TU_CommTaskData comm_gather = {};
-    Node *gather_task = tu_comm_task(&dfg, &graph, "comm_gather", &comm_gather, {1}, comm_group);
+    Node *gather_task = tu_comm_task(&dfg, graph, "comm_gather", &comm_gather, {1}, comm_group);
     assert(gather_task != nullptr);
     defer(tu_comm_task_destroy(&comm_gather));
 
-    Node *init_task    = tu_task(&graph, "init", nullptr, {1}, {1}, compute_group, 40);
-    Node *compute_task = tu_task(&graph, "compute", nullptr, {1}, {1}, compute_group, 40);
-    Node *fini_task    = tu_task(&graph, "fini", nullptr, {1}, {1}, compute_group, 40);
+    Node *init_task    = tu_task(graph, "init", nullptr, {1}, {1}, compute_group, 40);
+    Node *compute_task = tu_task(graph, "compute", nullptr, {1}, {1}, compute_group, 40);
+    Node *fini_task    = tu_task(graph, "fini", nullptr, {1}, {1}, compute_group, 40);
 
     // normal nodes
     tu_exec(init_task, 1, [](TU_ExecContext *ctx, void *data, tu_i64 type) {
@@ -94,14 +94,14 @@ void test_graph(uint32_t rank) {
         tu_result(ctx, data, type);
     });
 
-    tu_add_inputs(&graph, init_task);
+    tu_add_inputs(graph, init_task);
     tu_edges(init_task, scatter_task);
     tu_edges(scatter_task, compute_task);
     tu_edges(compute_task, gather_task);
     tu_edges(gather_task, fini_task);
-    tu_add_outputs(&graph, fini_task);
+    tu_add_outputs(graph, fini_task);
 
-    tu_dfg_set_graph(&dfg, &graph);
+    tu_dfg_set_graph(&dfg, graph);
 
     tu_dfg_exec(&dfg);
 

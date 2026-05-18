@@ -9,9 +9,9 @@
 #include "timer.hpp"
 #include "defer.hpp"
 
-constexpr size_t M_SIZE = 256;
-constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 128;
-// #define DGEMM_HH
+constexpr size_t M_SIZE = 20000;
+constexpr size_t M = M_SIZE, N = M_SIZE, K = M_SIZE, TILE_SIZE = 2048;
+#define DGEMM_HH
 
 #ifdef DGEMM_HH
 #include "hedgehog_dgemm.hpp"
@@ -30,7 +30,6 @@ void matmul(Matrix const &A, Matrix const &B, Matrix &C) {
 }
 
 MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
-    printf("allocate tile [%ld, %ld]\n", row, col);
     auto tile = new MatrixTile();
     tile->row = row;
     tile->col = col;
@@ -43,7 +42,6 @@ MatrixTile *allocate_tile(size_t rows, size_t cols, size_t row, size_t col) {
 }
 
 void deallocate_tile(MatrixTile *tile) {
-    printf("release tile [%ld, %ld]\n", tile->row, tile->col);
     delete[] tile->data;
     delete tile;
 }
@@ -305,15 +303,14 @@ void test_dgemm_dfg(Matrix &A, Matrix &B, Matrix &C, Matrix const &E) {
 
     SplitTaskData split_task_data{
         .tile_size = TILE_SIZE,
-        .tiles_mem = {
-            std::vector<MatrixTile>(TM * TK),
-            std::vector<MatrixTile>(TK * TN),
-            std::vector<MatrixTile>(TM * TN),
-        },
+        .tiles_mem = { {}, {}, {} },
         .TM = TM,
         .TN = TN,
         .TK = TK,
     };
+    split_task_data.tiles_mem[0].reserve(TM * TK);
+    split_task_data.tiles_mem[1].reserve(TK * TN);
+    split_task_data.tiles_mem[2].reserve(TM * TN);
 
     ProductStateData product_state_data{
         .A_tiles = std::vector<MatrixTile*>(TM * TK),
@@ -419,10 +416,12 @@ int main(int, char **) {
     Matrix B(K, N);
     Matrix C(M, N);
     Matrix E(M, N); // Expected
-    // matrix_init_double(A);
-    // matrix_init_double(B);
-    matrix_init_int(A);
-    matrix_init_int(B);
+    matrix_init_double(A);
+    matrix_init_double(B);
+    // matrix_init_int(A);
+    // matrix_init_int(B);
+    matrix_zero(C);
+    matrix_zero(E);
 
     printf("compute ground truth...\n");
     matmul(A, B, E);

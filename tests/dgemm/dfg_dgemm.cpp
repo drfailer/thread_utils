@@ -12,27 +12,27 @@ void split_task_exec(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
 
     for (size_t i = 0; i < M->rows; i += task_data->tile_size) {
         for (size_t j = 0; j < M->cols; j += task_data->tile_size) {
-            // there is only one thread splitting the matrix M so we can
-            // use the memory safely
-            task_data->tiles_mem[type].push_back(MatrixTile{
-                .row = i / task_data->tile_size,
-                .col = j / task_data->tile_size,
-                .rows = std::min(M->rows - i, task_data->tile_size),
-                .cols = std::min(M->cols - j, task_data->tile_size),
-                .matrixRow = i,
-                .matrixCol = j,
-                .matrixRows = M->rows,
-                .matrixCols = M->cols,
-                .data = &M->operator()(i, j),
-            });
+            // there is only one thread splitting the matrix for this type so
+            // we can use the memory safely
+            task_data->tiles_mem[type].emplace_back();
+            auto tile = &task_data->tiles_mem[type].back();
+            tile->row = i / task_data->tile_size;
+            tile->col = j / task_data->tile_size;
+            tile->rows = std::min(M->rows - i, task_data->tile_size);
+            tile->cols = std::min(M->cols - j, task_data->tile_size);
+            tile->matrixRow = i;
+            tile->matrixCol = j;
+            tile->matrixRows = M->rows;
+            tile->matrixCols = M->cols;
+            tile->data = &M->operator()(i, j);
             tu_i64 output_type = 0;
             switch (type) {
             case T_MatrixA: output_type = T_TileA; break;
-            case T_MatrixB: output_type = T_TileC; break;
-            case T_MatrixC: output_type = T_TileB; break;
+            case T_MatrixB: output_type = T_TileB; break;
+            case T_MatrixC: output_type = T_TileC; break;
             default: assert(false); break;
             }
-            tu_result(ctx, &task_data->tiles_mem[type].back(), output_type);
+            tu_result(ctx, tile, output_type);
         }
     }
 }
@@ -65,9 +65,11 @@ void sum_task_exec(TU_ExecContext *ctx, void *rawdata, tu_i64 type) {
     assert(p->cols == c->cols);
 
     // printf("sum C[%ld,%ld]\n", c->row, c->col);
-    for (size_t row = 0; row < p->rows; ++row) {
-        for (size_t col = 0; col < p->cols; ++col) {
-            (*c)(row, col) += (*p)(row, col);
+    for (size_t row = 0; row < c->rows; ++row) {
+        size_t c_row = row * c->matrixCols;
+        size_t p_row = row * p->cols;
+        for (size_t col = 0; col < c->cols; ++col) {
+            c->data[c_row + col] += p->data[p_row + col];
         }
     }
     tu_result(ctx, tiles, type);

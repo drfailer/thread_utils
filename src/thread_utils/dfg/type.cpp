@@ -13,13 +13,14 @@ TU_TypeId tu_new_type(TU_Dfg *dfg, char const *name, size_t size) {
     return type;
 }
 
-bool tu_type_alloc(TU_Dfg *dfg, TU_TypeId type, TU_AllocProc alloc, TU_FreeProc free) {
+bool tu_type_alloc(TU_Dfg *dfg, TU_TypeId type, void allocator_data, TU_AllocProc alloc, TU_FreeProc free) {
     if (type >= dfg->type_registry.type_count) {
         printf("[TU_ERROR]: tu_type_alloc failed, type with id `%d' is not registerd.\n", type);
         return false;
     }
     dfg->type_registry.registers[type].alloc = alloc;
     dfg->type_registry.registers[type].free = free;
+    dfg->type_registry.registers[type].allocator_data = allocator_data;
     return true;
 }
 

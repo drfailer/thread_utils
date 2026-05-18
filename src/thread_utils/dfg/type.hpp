@@ -5,19 +5,13 @@ struct TU_TypeRegister;
 
 // Memory allocation:
 //
-// The data that flows within the graph will be allocated from memory pools.
-// This allows both simple and efficient memory management during the graph
-// execution, and it also allows controlling the amount of allocated data (free
-// allocation cannot keep track of the number of allocated items).
+// Functins that should be specified when using the communicator task (the
+// receiver needs to allocate data). It can also be used in the standard tasks.
 //
-// To allow the pool to allocated and free data, the user needs to provide the
-// corresponding functions. This makes more sense than just sized based allocations
-// which doesn't work well with complex data (GPU buffers, ...). On top of that,
-// it facilitates wrapper creation in other languages (ex: C++ constructor /
-// destructor madness).
+// TODO: do we want to optionaly store the pointers somewhere and do some reference counting?
 
-using TU_AllocProc = void *(*)(TU_TypeId);
-using TU_FreeProc = void (*)(void *, TU_TypeId);
+using TU_AllocProc = void *(*)(void *, TU_TypeId);
+using TU_FreeProc = void (*)(void *, void *, TU_TypeId);
 
 // Packing
 //
@@ -66,9 +60,9 @@ struct TU_TypeRegister {
     size_t size; // sizeof used for memcpy
 
     // Memory management
-    // TODO TU_MemoryPool mem_pool; // allow allocating the data that flows through the graph
     TU_AllocProc alloc;     // used to allocate data in the pool
     TU_FreeProc free;       // used to free data from the pool
+    void *allocator_data;   // optional data for the allocator
 
     // Packing procs used with the communicator tasks
     TU_PackProc pack;       // packing callback if serialization needed
